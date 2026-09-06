@@ -109,7 +109,8 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
     if (isAtEnd()) return nullptr;
 
     switch (peek().type) {
-        case TokenType::PRINT: return parsePrint();
+        case TokenType::PRINT: return parsePrint(false);
+        case TokenType::SILENT_PRINT: return parsePrint(true);
         case TokenType::WRITE: return parseWrite();
         case TokenType::APP: return parseApp();
         case TokenType::WINDOW: return parseWindow();
@@ -124,7 +125,7 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
     }
 }
 
-std::unique_ptr<Stmt> Parser::parsePrint() {
+std::unique_ptr<Stmt> Parser::parsePrint(bool silent) {
     int line = advance().line;
     std::vector<std::unique_ptr<Expr>> args;
 
@@ -138,7 +139,7 @@ std::unique_ptr<Stmt> Parser::parsePrint() {
         match(TokenType::COMMA);
     }
     match(TokenType::NEWLINE);
-    return std::make_unique<PrintStmt>(std::move(args), line);
+    return std::make_unique<PrintStmt>(std::move(args), line, 0, silent);
 }
 
 std::unique_ptr<Stmt> Parser::parseWrite() {
@@ -399,6 +400,23 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> expr) {
 }
 
 std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
+    if (match(TokenType::SILENT_PRINT)) {
+        int line = previous().line;
+        std::vector<std::unique_ptr<Expr>> args;
+        while (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) &&
+               !check(TokenType::RPAREN) && !check(TokenType::RBRACKET) && !isAtEnd()) {
+            match(TokenType::COMMA);
+            if (check(TokenType::NEWLINE) || check(TokenType::DEDENT) || check(TokenType::END) ||
+                check(TokenType::RPAREN) || check(TokenType::RBRACKET) || isAtEnd()) break;
+            auto expr = parseExpression();
+            if (expr) {
+                args.push_back(std::move(expr));
+            }
+            match(TokenType::COMMA);
+        }
+        return std::make_unique<CallExpr>("silent_print", std::move(args), line);
+    }
+
     if (match(TokenType::READ)) {
         auto path = parseUnary();
         return std::make_unique<ReadExpr>(std::move(path));

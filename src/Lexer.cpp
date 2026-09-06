@@ -1,4 +1,4 @@
-﻿#include "Lexer.hpp"
+#include "Lexer.hpp"
 #include <cctype>
 #include <cstdlib>
 
@@ -15,6 +15,7 @@ Lexer::Lexer(std::string source)
 
 void Lexer::initKeywords() {
     keywords_["print"] = TokenType::PRINT;
+    keywords_["silent_print"] = TokenType::SILENT_PRINT;
     keywords_["if"] = TokenType::IF;
     keywords_["else"] = TokenType::ELSE;
     keywords_["loop"] = TokenType::LOOP;

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <string_view>
@@ -18,6 +18,7 @@ enum class TokenType {
     NIL,
 
     PRINT,
+    SILENT_PRINT,
     IF,
     ELSE,
     LOOP,

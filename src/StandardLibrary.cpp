@@ -38,6 +38,15 @@ Value StandardLibrary::print(const std::vector<Value>& args) {
     return Value(out + "\n");
 }
 
+Value StandardLibrary::silentPrint(const std::vector<Value>& args) {
+    std::string out;
+    for (size_t i = 0; i < args.size(); ++i) {
+        if (i > 0) out += " ";
+        out += args[i].toString();
+    }
+    return Value(out + "\n");
+}
+
 Value StandardLibrary::readFile(const std::string& path) {
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open()) {

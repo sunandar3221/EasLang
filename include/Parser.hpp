@@ -30,7 +30,7 @@ private:
     void skipNewlines();
 
     std::unique_ptr<BlockStmt> parseBlock();
-    std::unique_ptr<Stmt> parsePrint();
+    std::unique_ptr<Stmt> parsePrint(bool silent = false);
     std::unique_ptr<Stmt> parseWrite();
     std::unique_ptr<Stmt> parseApp();
     std::unique_ptr<Stmt> parseWindow();

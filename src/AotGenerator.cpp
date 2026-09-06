@@ -125,6 +125,15 @@ std::string AotGenerator::generateExpr(Expr* expr) {
         if (callee == "send" && call->arguments.size() >= 2) {
             return "StandardLibrary::httpSend((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
         }
+        if (callee == "silent_print") {
+            std::string sp = "StandardLibrary::silentPrint(std::vector<Value>{";
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                if (i > 0) sp += ", ";
+                sp += "Value(" + generateExpr(call->arguments[i].get()) + ")";
+            }
+            sp += "})";
+            return sp;
+        }
 
         std::string s = "fn_" + callee + "(";
         for (size_t i = 0; i < call->arguments.size(); ++i) {
@@ -269,7 +278,11 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
 
     if (auto* printStmt = dynamic_cast<PrintStmt*>(stmt)) {
         emitIndent(ss);
-        ss << "StandardLibrary::print(std::vector<Value>{";
+        if (printStmt->silent) {
+            ss << "StandardLibrary::silentPrint(std::vector<Value>{";
+        } else {
+            ss << "StandardLibrary::print(std::vector<Value>{";
+        }
         for (size_t i = 0; i < printStmt->arguments.size(); ++i) {
             if (i > 0) ss << ", ";
             ss << "Value(" << generateExpr(printStmt->arguments[i].get()) << ")";

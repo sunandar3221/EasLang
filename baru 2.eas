@@ -1,4 +1,4 @@
 halo = loop 3000
-    print "Pengulangan loop"
+    silent_print "kamu manusia apa apa"
 
 write "hai.txt" halo

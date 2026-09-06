@@ -7,6 +7,7 @@
 class StandardLibrary {
 public:
     static Value print(const std::vector<Value>& args);
+    static Value silentPrint(const std::vector<Value>& args);
     static Value readFile(const std::string& path);
     static Value writeFile(const std::string& path, const std::string& content);
     static Value httpGet(const std::string& url);

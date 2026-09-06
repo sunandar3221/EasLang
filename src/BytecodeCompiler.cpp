@@ -88,7 +88,7 @@ void BytecodeCompiler::compileBlockAsExpr(BlockStmt* block, int line) {
                 for (const auto& a : printStmt->arguments) {
                     compileExpr(a.get());
                 }
-                currentChunk_->emitOp(OpCode::OP_PRINT, printStmt->line);
+                currentChunk_->emitOp(printStmt->silent ? OpCode::OP_SILENT_PRINT : OpCode::OP_PRINT, printStmt->line);
                 currentChunk_->emit(static_cast<uint8_t>(printStmt->arguments.size()), printStmt->line);
             } else {
                 compileStmt(stmt);
@@ -231,7 +231,7 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         for (const auto& a : printStmt->arguments) {
             compileExpr(a.get());
         }
-        currentChunk_->emitOp(OpCode::OP_PRINT, printStmt->line);
+        currentChunk_->emitOp(printStmt->silent ? OpCode::OP_SILENT_PRINT : OpCode::OP_PRINT, printStmt->line);
         currentChunk_->emit(static_cast<uint8_t>(printStmt->arguments.size()), printStmt->line);
         currentChunk_->emitOp(OpCode::OP_POP, printStmt->line);
         return;
@@ -350,7 +350,7 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
                 for (const auto& a : printStmt->arguments) {
                     compileExpr(a.get());
                 }
-                currentChunk_->emitOp(OpCode::OP_PRINT, printStmt->line);
+                currentChunk_->emitOp(printStmt->silent ? OpCode::OP_SILENT_PRINT : OpCode::OP_PRINT, printStmt->line);
                 currentChunk_->emit(static_cast<uint8_t>(printStmt->arguments.size()), printStmt->line);
                 currentChunk_->emitOp(OpCode::OP_ADD, loopExpr->line);
                 currentChunk_->emitOp(OpCode::OP_SET_LOCAL, loopExpr->line);

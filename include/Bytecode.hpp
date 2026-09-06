@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Value.hpp"
 #include <vector>
@@ -34,6 +34,7 @@ enum class OpCode : uint8_t {
     OP_CALL,
     OP_RETURN,
     OP_PRINT,
+    OP_SILENT_PRINT,
     OP_READ,
     OP_WRITE,
     OP_APP,

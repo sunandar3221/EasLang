@@ -101,6 +101,16 @@ while counter > 0
     counter = counter - 1
 ```
 
+#### Loop Assignment & `silent_print`
+Ekspresi `loop` dapat ditugaskan langsung ke variabel untuk mengumpulkan seluruh outputnya. Gunakan `silent_print` agar memformat baris teks tanpa membanjiri layar terminal:
+
+```eas
+halo = loop 3000
+    silent_print "kamu manusia apa apa"
+
+write "hai.txt" halo
+```
+
 ### Bab 6: Fungsi & Implicit Return (`fn`)
 Fungsi dideklarasikan dengan kata kunci `fn`, diikuti nama fungsi dan parameter yang dipisahkan spasi. **Tidak diperlukan keyword `return`**: baris atau ekspresi terakhir dalam fungsi otomatis menjadi nilai baliknya.
 
@@ -173,6 +183,7 @@ use "matematika.eas"
 | Keyword | Kategori | Fungsi & Keterangan | Contoh Kode |
 | :--- | :--- | :--- | :--- |
 | `print` | Output | Menampilkan satu atau beberapa ekspresi ke konsol standar dengan spasi pemisah dan diakhiri baris baru | `print "Halo" 123` |
+| `silent_print` | Output | Memformat teks seperti `print` tanpa mencetak ke terminal konsol (mencegah banjir output saat pengulangan data) | `silent_print "Data"` |
 | `if` | Logika | Memulai blok percabangan kondisional berdasarkan nilai kebenaran (*truthiness*) | `if score > 75` |
 | `else` | Logika | Blok alternatif jika kondisi `if` sebelumnya bernilai salah | `else` |
 | `loop` | Iterasi | Mengulang eksekusi blok sebanyak $n$ kali secara terhitung | `loop 10` |

@@ -330,6 +330,13 @@ Value VM::run(Chunk* chunk) {
                     }
                     top -= argCount;
                     *top++ = StandardLibrary::print(args);
+                } else if (name == "silent_print") {
+                    std::vector<Value> args;
+                    for (size_t i = 0; i < argCount; ++i) {
+                        args.push_back(*(top - argCount + i));
+                    }
+                    top -= argCount;
+                    *top++ = StandardLibrary::silentPrint(args);
                 } else if (name == "read") {
                     Value path = *(--top);
                     *top++ = StandardLibrary::readFile(path.toString());
@@ -416,6 +423,16 @@ Value VM::run(Chunk* chunk) {
                 }
                 top -= argCount;
                 *top++ = StandardLibrary::print(args);
+                break;
+            }
+            case OpCode::OP_SILENT_PRINT: {
+                uint8_t argCount = code[ip++];
+                std::vector<Value> args;
+                for (size_t i = 0; i < argCount; ++i) {
+                    args.push_back(*(top - argCount + i));
+                }
+                top -= argCount;
+                *top++ = StandardLibrary::silentPrint(args);
                 break;
             }
             case OpCode::OP_WRITE: {

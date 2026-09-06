@@ -1,4 +1,4 @@
-﻿#include "Interpreter.hpp"
+#include "Interpreter.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
 
@@ -106,6 +106,9 @@ Value Interpreter::execute(Stmt* stmt) {
         std::vector<Value> args;
         for (const auto& a : printStmt->arguments) {
             args.push_back(evaluate(a.get()));
+        }
+        if (printStmt->silent) {
+            return StandardLibrary::silentPrint(args);
         }
         StandardLibrary::print(args);
         return Value();
@@ -240,6 +243,14 @@ Value Interpreter::evaluate(Expr* expr) {
             if (arg.isString()) return Value(static_cast<int64_t>(arg.strVal.size()));
             if (arg.isObject()) return Value(static_cast<int64_t>(arg.objVal ? arg.objVal->size() : 0));
             return Value(static_cast<int64_t>(0));
+        }
+
+        if (name == "silent_print") {
+            std::vector<Value> args;
+            for (const auto& a : call->arguments) {
+                args.push_back(evaluate(a.get()));
+            }
+            return StandardLibrary::silentPrint(args);
         }
 
         if (name == "push" && call->arguments.size() >= 2) {

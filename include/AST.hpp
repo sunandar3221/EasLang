@@ -202,8 +202,9 @@ public:
 class PrintStmt : public Stmt {
 public:
     std::vector<std::unique_ptr<Expr>> arguments;
-    PrintStmt(std::vector<std::unique_ptr<Expr>> args, int l = 0, int c = 0)
-        : Stmt(l, c), arguments(std::move(args)) {}
+    bool silent;
+    PrintStmt(std::vector<std::unique_ptr<Expr>> args, int l = 0, int c = 0, bool s = false)
+        : Stmt(l, c), arguments(std::move(args)), silent(s) {}
 };
 
 class WriteStmt : public Stmt {
