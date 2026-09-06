@@ -1,7 +1,10 @@
-﻿#include "VM.hpp"
+#include "VM.hpp"
 #include <iostream>
 
-VM::VM() {}
+VM::VM() {
+    stack_.resize(STACK_MAX);
+    frames_.resize(FRAMES_MAX);
+}
 
 void VM::registerFunction(const std::string& name, std::shared_ptr<Chunk> chunk) {
     functions_[name] = std::move(chunk);
@@ -15,9 +18,6 @@ void VM::registerFunctions(const std::unordered_map<std::string, std::shared_ptr
 
 Value VM::run(Chunk* chunk) {
     if (!chunk) return Value();
-
-    stack_.resize(STACK_MAX);
-    frames_.resize(FRAMES_MAX);
 
     auto resolveChunk = [this](Chunk* c) {
         if (!c) return;

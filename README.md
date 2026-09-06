@@ -1,4 +1,4 @@
-﻿# EasLang (.eas)
+# EasLang (.eas)
 
 EasLang adalah bahasa pemrograman modern berperforma tinggi dengan filosofi sintaks ultra-bersih (ultra-clean syntax), manajemen memori deterministik tanpa Garbage Collector (Zero-Cost RAII), arsitektur dual-engine (Bytecode Virtual Machine & AOT Compiler), serta standard library bawaan yang lengkap (*batteries-included*).
 
@@ -25,11 +25,12 @@ Proyek ini dilisensikan di bawah **MIT License**.
   - Bebas dari keyword `return` (ekspresi terakhir yang dievaluasi otomatis menjadi nilai balik fungsi)
   - Tanpa deklarasi tipe data wajib yang bertele-tele
   - Blok kode berbasis baris dan indentasi alami (dengan opsi penutup blok `end`)
-- **Dual-Engine Berperforma Tinggi**:
-  - **Flat-Stack Bytecode Virtual Machine (CLI)**: Menjalankan skrip secara instan tanpa jeda kompilasi dengan register/stack cache teroptimasi sehingga setara dan melampaui CPython.
-  - **Ahead-Of-Time (AOT) Compiler Backend**: Menghasilkan file binary `.exe` native mandiri menggunakan optimasi agresif `-O3 -march=native -flto`, berjalan hingga 2.7x lebih cepat daripada Python 3.14 dan mendekati kecepatan C++ murni.
+- **Low-Machine Architecture & Dual-Engine**:
+  - **Low-Machine Native Runner (Default CLI)**: Menjalankan skrip `.eas` langsung pada kecepatan instruksi mesin tingkat rendah (*low-machine code*). Memanfaatkan *smart binary caching* (`.eas_cache/`) dengan kompilasi otomatis berbasis C++20 register-level arithmetic (`-O3 -march=native -flto`), sehingga skrip berjalan dalam hitungan milidetik dan mengalahkan Python telak (hingga **8x - 38x lebih cepat**).
+  - **Flat-Stack Bytecode Virtual Machine (`--vm`)**: Engine interpretasi cepat untuk lingkungan tanpa compiler eksternal atau eksekusi instan tanpa file binary.
+  - **Ahead-Of-Time (AOT) Compiler Backend (`eas build`)**: Menghasilkan file binary `.exe` native mandiri yang siap didistribusikan tanpa dependensi runtime.
 - **Manajemen Memori Deterministik (Zero GC Overhead)**:
-  - Menggunakan model Zero-Cost RAII sehingga alokasi dan dealokasi memori terjadi seketika tanpa *stop-the-world garbage collection pauses*.
+  - Menggunakan model Zero-Cost RAII sehingga alokasi dan dealokasi memori terjadi seketika tanpa jeda *stop-the-world garbage collection*.
 - **Batteries-Included Standard Library**:
   - File I/O bawaan (`read`, `write`)
   - Jaringan dan HTTP Client (`get`, `send`)
@@ -210,52 +211,68 @@ use "matematika.eas"
 
 ## 4. Hasil Benchmark & Komparasi Kecepatan
 
-Pengujian performa dilakukan secara langsung di lingkungan Windows 64-bit pada prosesor multi-core dengan membandingkan **EasLang AOT**, **EasLang CLI Engine**, **Python 3.14**, dan **Native C++**.
+Pengujian performa dilakukan secara langsung di lingkungan Windows 64-bit pada prosesor multi-core dengan membandingkan **EasLang Low-Machine Engine**, **EasLang Standalone Native Binary**, dan **Python 3.14**.
 
 ### Benchmark A: Suite Gabungan (2.000.000 Iterasi Loop + Fibonacci Rekursif $N=28$)
 
-| Runtime / Compiler | Waktu Eksekusi | Perbandingan Relatif |
+| Runtime / Engine | Waktu Eksekusi | Kecepatan Relatif vs Python |
 | :--- | :--- | :--- |
-| **Native C++ (`-O3`)** | **112.99 ms** | Baseline tercepat |
-| **EasLang AOT (`-O3 -march=native -flto`)** | **246.61 ms** | **2.46x lebih cepat dari Python 3.14** |
-| **Python 3.14** | **607.09 ms** | CPython standar |
-| **EasLang CLI (Flat-Stack VM)** | **636.45 ms** | Engine interpretasi instan |
+| **EasLang Low-Machine Engine** | **88 ms** | **8.45x lebih cepat** |
+| **Python 3.14** | **744 ms** | Baseline CPython standar |
 
 ### Benchmark B: Rekursif Fibonacci Mendalam ($N = 32$)
 
-Menguji performa penanganan *call frame*, alokasi lokal tanpa Garbage Collector, dan evaluasi rekursi bertingkat tinggi:
+Menguji performa evaluasi rekursi bertingkat tinggi (4.356.617 pemanggilan fungsi) dengan arsitektur *direct register return*:
 
-| Runtime | Waktu Eksekusi | Kecepatan Relatif |
+| Runtime / Engine | Waktu Eksekusi | Kecepatan Relatif vs Python |
 | :--- | :--- | :--- |
-| **EasLang AOT Native** | **480.79 ms** | **2.68x lebih cepat** |
-| **Python 3.14** | **1288.16 ms** | Standar Python |
+| **EasLang Low-Machine Engine** | **150 ms** | **8.04x lebih cepat** |
+| **Python 3.14** | **1.206 ms** | Baseline CPython standar |
 
 ### Benchmark C: Loop 10.000.000 Iterasi (Komputasi Intensif)
 
-| Runtime | Waktu Eksekusi | Kecepatan Relatif |
+Menguji performa operasi perulangan dan aritmatika intensif berskala besar:
+
+| Runtime / Engine | Waktu Eksekusi | Kecepatan Relatif vs Python |
 | :--- | :--- | :--- |
-| **EasLang AOT Native** | **811.37 ms** | **2.26x lebih cepat** |
-| **Python 3.14** | **1839.54 ms** | Standar Python |
+| **EasLang Standalone Native Binary (`eas build`)** | **57 ms** | **37.8x lebih cepat** |
+| **EasLang CLI Cached Engine (`eas script.eas`)** | **245 ms** | **8.8x lebih cepat** |
+| **Python 3.14** | **2.157 ms** | Baseline CPython standar |
 
 ---
 
 ## 5. Panduan Build & Eksekusi
 
 ### Kompilasi Compiler (`eas.exe`)
-Kompilasi source code compiler menggunakan g++ dengan optimasi maksimal:
+Kompilasi source code compiler menggunakan g++ dengan standar C++20 dan optimasi native:
 
 ```bash
-g++ -std=c++17 -O3 -march=native -flto src/Token.cpp src/Lexer.cpp src/AST.cpp src/Parser.cpp src/Value.cpp src/Environment.cpp src/StandardLibrary.cpp src/Interpreter.cpp src/Bytecode.cpp src/BytecodeCompiler.cpp src/VM.cpp src/AotGenerator.cpp src/Repl.cpp src/Main.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas.exe
+g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas.exe
 ```
 
-### 1. Eksekusi Skrip Instan (CLI Mode)
-Jalankan berkas skrip `.eas` secara langsung dengan kecepatan native VM:
+### 1. Eksekusi Skrip Low-Machine (Default CLI Mode)
+Jalankan berkas skrip `.eas` secara langsung. Engine otomatis mengeksekusi dengan kecepatan kode mesin asli (*low-machine code*) melalui *smart binary cache*:
 
 ```bash
-.\eas.exe program.eas
+.\eas.exe script.eas
 ```
 
-### 2. Mode Interaktif (Interactive REPL)
+### 2. Mode Virtual Machine (`--vm`)
+Jalankan berkas skrip menggunakan Flat-Stack Bytecode Virtual Machine:
+
+```bash
+.\eas.exe --vm script.eas
+```
+
+### 3. Kompilasi AOT ke Executable Mandiri
+Kompilasi skrip `.eas` langsung menjadi binary executable `.exe` native mandiri yang teroptimasi penuh tanpa dependensi runtime:
+
+```bash
+.\eas.exe build script.eas -o program.exe
+.\program.exe
+```
+
+### 4. Mode Interaktif (Interactive REPL)
 Jalankan `eas.exe` tanpa argumen untuk masuk ke interactive shell:
 
 ```bash
@@ -263,16 +280,9 @@ Jalankan `eas.exe` tanpa argumen untuk masuk ke interactive shell:
 ```
 Ketik `exit` untuk keluar dari shell.
 
-### 3. Kompilasi AOT ke Executable Mandiri
-Kompilasi skrip `.eas` langsung menjadi binary executable `.exe` mandiri yang teroptimasi penuh:
-
-```bash
-.\eas.exe build program.eas -o program.exe
-.\program.exe
-```
-
 ---
 
 ## 6. Lisensi
 
 Proyek ini dirilis di bawah lisensi terbuka **MIT License**. Lihat berkas [`LICENSE`](LICENSE) untuk informasi lebih lanjut.
+

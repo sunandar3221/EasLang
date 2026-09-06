@@ -41,6 +41,10 @@ public:
     Value& operator=(const Value& other);
     Value& operator=(Value&& other) noexcept;
 
+    operator int64_t() const { return asInt(); }
+    operator double() const { return asFloat(); }
+    operator bool() const { return isTruthy(); }
+
     static Value makeList();
     static Value makeObject();
 
@@ -75,5 +79,16 @@ public:
     Value getProperty(const std::string& key) const;
     void setProperty(const std::string& key, const Value& val);
 };
+
+inline int64_t operator+(int64_t i, const Value& v) { return i + v.asInt(); }
+inline int64_t operator-(int64_t i, const Value& v) { return i - v.asInt(); }
+inline int64_t operator*(int64_t i, const Value& v) { return i * v.asInt(); }
+inline int64_t operator/(int64_t i, const Value& v) { int64_t d = v.asInt(); return d ? i / d : 0; }
+inline bool operator<(int64_t i, const Value& v) { return i < v.asInt(); }
+inline bool operator<=(int64_t i, const Value& v) { return i <= v.asInt(); }
+inline bool operator>(int64_t i, const Value& v) { return i > v.asInt(); }
+inline bool operator>=(int64_t i, const Value& v) { return i >= v.asInt(); }
+inline bool operator==(int64_t i, const Value& v) { return i == v.asInt(); }
+inline bool operator!=(int64_t i, const Value& v) { return i != v.asInt(); }
 
 std::ostream& operator<<(std::ostream& os, const Value& val);

@@ -1,5 +1,6 @@
-﻿*.exe
+*.exe
 *.o
 *.obj
 _eas_aot_temp.cpp
 output_test.txt
+.eas_cache/

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "AST.hpp"
 #include <string>
@@ -17,6 +17,7 @@ private:
 
     void emitIndent(std::ostringstream& ss);
     void generateStmt(Stmt* stmt, std::ostringstream& ss);
-    void generateBlock(BlockStmt* block, std::ostringstream& ss);
+    void generateBlock(BlockStmt* block, std::ostringstream& ss, bool isFunctionBody = false);
+    void generateReturnStmt(Stmt* stmt, std::ostringstream& ss);
     std::string generateExpr(Expr* expr);
 };
