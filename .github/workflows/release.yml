@@ -58,8 +58,10 @@ jobs:
         run: |
           NDK_DIR=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
           echo "Found Android NDK at: $NDK_DIR"
-          $NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -o eas-android-arm64
+          $NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++ -std=c++20 -O3 -flto -static-libstdc++ src/*.cpp -Iinclude -o eas-android-arm64
           chmod +x eas-android-arm64
+          echo "Verifying shared library dependencies of eas-android-arm64:"
+          readelf -d eas-android-arm64 | grep NEEDED || true
 
       - name: Upload Linux and Android Artifacts
         uses: actions/upload-artifact@v4

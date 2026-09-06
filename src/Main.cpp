@@ -17,6 +17,14 @@ int main(int argc, char* argv[]) {
     }
 
     std::string arg1 = argv[1];
+    if (arg1 == "-v" || arg1 == "--version" || arg1 == "version") {
+        std::cout << "EasLang v1.0.0\n";
+        return 0;
+    }
+    if (arg1 == "-h" || arg1 == "--help" || arg1 == "help") {
+        std::cout << "Usage: eas [script.eas] | build <script.eas> [-o output] | --version\n";
+        return 0;
+    }
 
     if (arg1 == "build" || arg1 == "-c" || arg1 == "--compile") {
         if (argc < 3) {

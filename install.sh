@@ -83,6 +83,16 @@ fi
 
 chmod +x "$TEMP_BIN"
 
+if ! "$TEMP_BIN" -v >/dev/null 2>&1; then
+  if [ "$IS_TERMUX" -eq 1 ] && [ "$ARCH_TAG" = "arm64" ]; then
+    echo "Notice: Testing static ARM64 binary fallback..."
+    STATIC_URL="https://github.com/$REPO/releases/download/v1.0.0/eas-linux-arm64-static"
+    if curl -sSL --fail "$STATIC_URL" -o "$TEMP_BIN" 2>/dev/null || wget -q "$STATIC_URL" -O "$TEMP_BIN" 2>/dev/null; then
+      chmod +x "$TEMP_BIN"
+    fi
+  fi
+fi
+
 if [ -w "$BIN_DIR" ]; then
   mv "$TEMP_BIN" "$BIN_DIR/eas"
 else
