@@ -8,11 +8,12 @@ Proyek ini dilisensikan di bawah **MIT License**.
 
 ## Daftar Isi
 1. [Filosofi & Arsitektur](#1-filosofi--arsitektur)
-2. [Kursus Kilat EasLang (Crash Course)](#2-kursus-kilat-easlang-crash-course)
-3. [Kamus Keyword & Operator](#3-kamus-keyword--operator)
-4. [Hasil Benchmark & Komparasi Kecepatan](#4-hasil-benchmark--komparasi-kecepatan)
-5. [Panduan Build & Eksekusi](#5-panduan-build--eksekusi)
-6. [Lisensi](#6-lisensi)
+2. [Tutorial & Panduan Instalasi](#2-tutorial--panduan-instalasi)
+3. [Kursus Kilat EasLang (Crash Course)](#3-kursus-kilat-easlang-crash-course)
+4. [Kamus Keyword & Operator](#4-kamus-keyword--operator)
+5. [Hasil Benchmark & Komparasi Kecepatan](#5-hasil-benchmark--komparasi-kecepatan)
+6. [Panduan Eksekusi & Kompilasi AOT](#6-panduan-eksekusi--kompilasi-aot)
+7. [Lisensi](#7-lisensi)
 
 ---
 
@@ -38,7 +39,113 @@ Proyek ini dilisensikan di bawah **MIT License**.
 
 ---
 
-## 2. Kursus Kilat EasLang (Crash Course)
+## 2. Tutorial & Panduan Instalasi
+
+Seluruh berkas binary resmi EasLang otomatis dikompilasi oleh **GitHub Actions CI/CD** untuk multi-platform (**Linux x86_64**, **Linux ARM64**, **Android Termux ARM64**, dan **Windows x64**). Anda **tidak perlu repot mengompilasi manual**.
+
+---
+
+### 🐧 Tutorial Instalasi di Linux (Ubuntu / Debian / Arch / Fedora / WSL)
+
+1. **Buka Terminal** Anda.
+2. **Jalankan Installer 1-Baris**:
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
+   ```
+   > 💡 **Apa yang dilakukan skrip ini?**
+   > - Mendeteksi arsitektur CPU secara otomatis (`x86_64` atau `ARM64/aarch64`).
+   > - Mengunduh binary prebuilt teroptimasi dari GitHub Releases.
+   > - Memasang binary langsung ke `/usr/local/bin/eas` (atau `~/.local/bin/eas`).
+
+3. **Verifikasi Instalasi**:
+   Ketik perintah `eas` untuk masuk ke interactive REPL:
+   ```bash
+   eas
+   ```
+   Atau buat dan jalankan skrip pertama Anda:
+   ```bash
+   echo 'print "Halo dari EasLang di Linux!"' > halo.eas
+   eas halo.eas
+   ```
+
+---
+
+### 📱 Tutorial Instalasi di Android (Termux)
+
+EasLang dapat berjalan secara native dan berkecepatan penuh di smartphone Android Anda menggunakan aplikasi **Termux**:
+
+1. **Buka Aplikasi Termux** di Android Anda.
+2. **Siapkan Paket Pendukung**:
+   ```bash
+   pkg update && pkg install curl -y
+   ```
+3. **Jalankan Installer 1-Baris**:
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
+   ```
+   > 💡 **Kelebihan di Termux:**
+   > - Mengunduh binary native Android Bionic (`eas-android-arm64`) yang dikompilasi langsung menggunakan Google Android NDK Clang.
+   > - Otomatis terpasang ke `$PREFIX/bin/eas` sehingga tidak butuh akses root/sudo sama sekali.
+
+4. **Verifikasi Instalasi**:
+   Ketik perintah berikut di Termux:
+   ```bash
+   eas
+   ```
+5. **Coba Jalankan Skrip Pertama di Android**:
+   ```bash
+   echo 'nama = "Android Termux"' > coba.eas
+   echo 'print "EasLang berjalan mulus di " + nama' >> coba.eas
+   eas coba.eas
+   ```
+
+---
+
+### 🪟 Tutorial Instalasi di Windows
+
+Anda dapat memilih salah satu dari dua metode berikut:
+
+#### Opsi 1: Unduh Cepat via PowerShell 1-Baris (Direkomendasikan)
+Buka PowerShell (tekan `Win + X` lalu pilih Terminal/PowerShell) dan jalankan:
+```powershell
+Invoke-WebRequest -Uri "https://github.com/sunandar3221/EasLang/releases/latest/download/eas.exe" -OutFile "$HOME\AppData\Local\Microsoft\WindowsApps\eas.exe"
+```
+> ✨ Direktori `WindowsApps` sudah otomatis terdaftar di `PATH` Windows, sehingga Anda dapat langsung mengetik `eas` atau `eas.exe` dari folder/terminal mana saja tanpa perlu setting Environment Variables secara manual!
+
+#### Opsi 2: Unduh Manual dari GitHub Releases
+1. Kunjungi [Halaman Rilis GitHub EasLang](https://github.com/sunandar3221/EasLang/releases/latest).
+2. Unduh berkas **`eas.exe`** (atau `eas-windows-x64.exe`).
+3. Simpan berkas di folder pilihan Anda (misal `C:\EasLang\eas.exe`).
+4. *(Opsional)* Tambahkan folder tersebut ke `PATH` di Environment Variables Windows.
+5. Buka Command Prompt (CMD) atau PowerShell, lalu jalankan:
+   ```cmd
+   eas.exe
+   ```
+
+---
+
+### 🛠️ Opsi: Kompilasi Mandiri dari Source Code (Khusus Developer)
+
+Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code EasLang:
+
+- **Linux / macOS / Termux**:
+  ```bash
+  git clone https://github.com/sunandar3221/EasLang.git
+  cd EasLang
+  make
+  sudo make install   # (di Termux cukup: make install)
+  ```
+
+- **Windows (MinGW / GCC / Clang)**:
+  ```bash
+  git clone https://github.com/sunandar3221/EasLang.git
+  cd EasLang
+  g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas.exe
+  ```
+
+---
+
+## 3. Kursus Kilat EasLang (Crash Course)
 
 ### Bab 1: Output Pertama & Variabel
 Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`.
@@ -176,7 +283,7 @@ use "matematika.eas"
 
 ---
 
-## 3. Kamus Keyword & Operator
+## 4. Kamus Keyword & Operator
 
 ### Kamus Keyword Lengkap
 
@@ -219,7 +326,7 @@ use "matematika.eas"
 
 ---
 
-## 4. Hasil Benchmark & Komparasi Kecepatan
+## 5. Hasil Benchmark & Komparasi Kecepatan
 
 Pengujian performa dilakukan secara langsung di lingkungan Windows 64-bit pada prosesor multi-core dengan membandingkan **EasLang Low-Machine Engine**, **EasLang Standalone Native Binary**, dan **Python 3.14**.
 
@@ -251,65 +358,47 @@ Menguji performa operasi perulangan dan aritmatika intensif berskala besar:
 
 ---
 
-## 5. Panduan Instalasi & Eksekusi
-
-### 🚀 Cara Instalasi Cepat (Prebuilt Binaries via GitHub Actions)
-Seluruh binary prebuilt untuk berbagai platform (Linux x86_64, Linux ARM64, Android Termux, dan Windows) otomatis dikompilasi oleh **GitHub Actions**. Anda tidak perlu repot melakukan kompilasi manual!
-
-#### 🐧 Linux (Ubuntu / Debian / Arch / Fedora)
-```bash
-curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
-```
-
-#### 📱 Android (Termux)
-```bash
-pkg update && pkg install curl -y
-curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
-```
-
-#### 🪟 Windows
-Unduh langsung berkas `eas.exe` dari [Halaman Rilis GitHub](https://github.com/sunandar3221/EasLang/releases/latest).
-
----
-
-### Kompilasi Manual dari Source Code
-
-#### Di Linux / macOS / Termux:
-```bash
-make
-```
-
-#### Di Windows (MinGW / GCC):
-```bash
-g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas.exe
-```
+## 6. Panduan Eksekusi & Kompilasi AOT
 
 ### 1. Eksekusi Skrip Instan Tanpa Cache (Default CLI Mode)
 Jalankan berkas skrip `.eas` secara langsung. Engine mengeksekusi secara instan di dalam memori tanpa meninggalkan berkas cache di penyimpanan disk (*zero disk cache*):
 
 ```bash
+# Di Linux & Android (Termux):
+eas script.eas
+
+# Di Windows:
 .\eas.exe script.eas
 ```
 
 ### 2. Kompilasi AOT ke Executable Mandiri (`build`)
-Kompilasi skrip `.eas` langsung menjadi binary executable `.exe` native mandiri yang teroptimasi penuh tanpa dependensi runtime:
+Kompilasi skrip `.eas` langsung menjadi binary executable native mandiri yang teroptimasi penuh (`-O3 -flto`) tanpa dependensi runtime:
 
 ```bash
+# Di Linux & Android (Termux):
+eas build script.eas -o program
+./program
+
+# Di Windows:
 .\eas.exe build script.eas -o program.exe
 .\program.exe
 ```
 
 ### 3. Mode Interaktif (Interactive REPL)
-Jalankan `eas.exe` tanpa argumen untuk masuk ke interactive shell:
+Jalankan `eas` tanpa argumen untuk masuk ke interactive shell:
 
 ```bash
+# Di Linux & Android (Termux):
+eas
+
+# Di Windows:
 .\eas.exe
 ```
-Ketik `exit` untuk keluar dari shell.
+Ketik `exit` untuk keluar dari REPL.
 
 ---
 
-## 6. Lisensi
+## 7. Lisensi
 
 Proyek ini dirilis di bawah lisensi terbuka **MIT License**. Lihat berkas [`LICENSE`](LICENSE) untuk informasi lebih lanjut.
 
