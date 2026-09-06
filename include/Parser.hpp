@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Token.hpp"
 #include "AST.hpp"
@@ -17,6 +17,8 @@ private:
     std::vector<Token> tokens_;
     size_t cursor_;
     std::unordered_map<std::string, int> functionArity_;
+    int anonFnCounter_;
+    std::vector<std::unique_ptr<FnDeclStmt>> hoistedAnonFns_;
 
     bool isAtEnd() const;
     const Token& peek() const;

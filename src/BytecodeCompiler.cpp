@@ -1,4 +1,4 @@
-﻿#include "BytecodeCompiler.hpp"
+#include "BytecodeCompiler.hpp"
 #include <algorithm>
 
 BytecodeCompiler::BytecodeCompiler()
@@ -70,6 +70,33 @@ void BytecodeCompiler::compileBlock(BlockStmt* block) {
             }
         }
         compileStmt(stmt);
+    }
+}
+
+void BytecodeCompiler::compileBlockAsExpr(BlockStmt* block, int line) {
+    if (!block || block->statements.empty()) {
+        currentChunk_->emitOp(OpCode::OP_NIL, line);
+        return;
+    }
+    for (size_t i = 0; i < block->statements.size(); ++i) {
+        bool isLast = (i + 1 == block->statements.size());
+        Stmt* stmt = block->statements[i].get();
+        if (isLast) {
+            if (auto* exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
+                compileExpr(exprStmt->expression.get());
+            } else if (auto* printStmt = dynamic_cast<PrintStmt*>(stmt)) {
+                for (const auto& a : printStmt->arguments) {
+                    compileExpr(a.get());
+                }
+                currentChunk_->emitOp(OpCode::OP_PRINT, printStmt->line);
+                currentChunk_->emit(static_cast<uint8_t>(printStmt->arguments.size()), printStmt->line);
+            } else {
+                compileStmt(stmt);
+                currentChunk_->emitOp(OpCode::OP_NIL, line);
+            }
+        } else {
+            compileStmt(stmt);
+        }
     }
 }
 
@@ -206,6 +233,7 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         }
         currentChunk_->emitOp(OpCode::OP_PRINT, printStmt->line);
         currentChunk_->emit(static_cast<uint8_t>(printStmt->arguments.size()), printStmt->line);
+        currentChunk_->emitOp(OpCode::OP_POP, printStmt->line);
         return;
     }
 
@@ -276,9 +304,112 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
                 return;
             }
         }
+        auto it = functions_.find(var->name);
+        if (it != functions_.end()) {
+            size_t idx = currentChunk_->addConstant(Value(ValueType::FUNCTION, var->name));
+            currentChunk_->emitOp(OpCode::OP_CONSTANT, var->line);
+            currentChunk_->emitShort(static_cast<uint16_t>(idx), var->line);
+            return;
+        }
         size_t idx = currentChunk_->addConstant(Value(var->name));
         currentChunk_->emitOp(OpCode::OP_GET_GLOBAL, var->line);
         currentChunk_->emitShort(static_cast<uint16_t>(idx), var->line);
+        return;
+    }
+
+    if (auto* loopExpr = dynamic_cast<LoopExpr*>(expr)) {
+        compileExpr(loopExpr->count.get());
+        std::string loopVar = "$lexpr_cnt_" + std::to_string(locals_.size());
+        addLocal(loopVar);
+        int loopSlot = static_cast<int>(locals_.size() - 1);
+        currentChunk_->emitOp(OpCode::OP_SET_LOCAL, loopExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(loopSlot), loopExpr->line);
+        currentChunk_->emitOp(OpCode::OP_POP, loopExpr->line);
+
+        currentChunk_->writeConstant(Value(""), loopExpr->line);
+        std::string accumVar = "$lexpr_acc_" + std::to_string(locals_.size());
+        addLocal(accumVar);
+        int accumSlot = static_cast<int>(locals_.size() - 1);
+        currentChunk_->emitOp(OpCode::OP_SET_LOCAL, loopExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(accumSlot), loopExpr->line);
+        currentChunk_->emitOp(OpCode::OP_POP, loopExpr->line);
+
+        size_t loopStart = currentChunk_->code.size();
+        currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(loopSlot), loopExpr->line);
+        currentChunk_->writeConstant(Value(static_cast<int64_t>(0)), loopExpr->line);
+        currentChunk_->emitOp(OpCode::OP_GREATER, loopExpr->line);
+        size_t exitJump = emitJump(OpCode::OP_JUMP_IF_FALSE, loopExpr->line);
+        currentChunk_->emitOp(OpCode::OP_POP, loopExpr->line);
+
+        for (size_t si = 0; si < loopExpr->body->statements.size(); ++si) {
+            auto* s = loopExpr->body->statements[si].get();
+            if (auto* printStmt = dynamic_cast<PrintStmt*>(s)) {
+                currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopExpr->line);
+                currentChunk_->emitShort(static_cast<uint16_t>(accumSlot), loopExpr->line);
+                for (const auto& a : printStmt->arguments) {
+                    compileExpr(a.get());
+                }
+                currentChunk_->emitOp(OpCode::OP_PRINT, printStmt->line);
+                currentChunk_->emit(static_cast<uint8_t>(printStmt->arguments.size()), printStmt->line);
+                currentChunk_->emitOp(OpCode::OP_ADD, loopExpr->line);
+                currentChunk_->emitOp(OpCode::OP_SET_LOCAL, loopExpr->line);
+                currentChunk_->emitShort(static_cast<uint16_t>(accumSlot), loopExpr->line);
+                currentChunk_->emitOp(OpCode::OP_POP, loopExpr->line);
+            } else if (auto* exprStmt = dynamic_cast<ExprStmt*>(s)) {
+                currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopExpr->line);
+                currentChunk_->emitShort(static_cast<uint16_t>(accumSlot), loopExpr->line);
+                compileExpr(exprStmt->expression.get());
+                currentChunk_->emitOp(OpCode::OP_ADD, loopExpr->line);
+                currentChunk_->emitOp(OpCode::OP_SET_LOCAL, loopExpr->line);
+                currentChunk_->emitShort(static_cast<uint16_t>(accumSlot), loopExpr->line);
+                currentChunk_->emitOp(OpCode::OP_POP, loopExpr->line);
+            } else {
+                compileStmt(s);
+            }
+        }
+
+        currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(loopSlot), loopExpr->line);
+        currentChunk_->writeConstant(Value(static_cast<int64_t>(1)), loopExpr->line);
+        currentChunk_->emitOp(OpCode::OP_SUB, loopExpr->line);
+        currentChunk_->emitOp(OpCode::OP_SET_LOCAL, loopExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(loopSlot), loopExpr->line);
+        currentChunk_->emitOp(OpCode::OP_POP, loopExpr->line);
+
+        emitLoop(loopStart, loopExpr->line);
+        patchJump(exitJump);
+        currentChunk_->emitOp(OpCode::OP_POP, loopExpr->line);
+
+        currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(accumSlot), loopExpr->line);
+
+        locals_.pop_back();
+        locals_.pop_back();
+        return;
+    }
+
+    if (auto* ifExpr = dynamic_cast<IfExpr*>(expr)) {
+        compileExpr(ifExpr->condition.get());
+        size_t thenJump = emitJump(OpCode::OP_JUMP_IF_FALSE, ifExpr->line);
+        currentChunk_->emitOp(OpCode::OP_POP, ifExpr->line);
+        compileBlockAsExpr(ifExpr->thenBranch.get(), ifExpr->line);
+        size_t elseJump = emitJump(OpCode::OP_JUMP, ifExpr->line);
+        patchJump(thenJump);
+        currentChunk_->emitOp(OpCode::OP_POP, ifExpr->line);
+        if (ifExpr->elseBranch) {
+            compileBlockAsExpr(ifExpr->elseBranch.get(), ifExpr->line);
+        } else {
+            currentChunk_->emitOp(OpCode::OP_NIL, ifExpr->line);
+        }
+        patchJump(elseJump);
+        return;
+    }
+
+    if (auto* fnExpr = dynamic_cast<FnExpr*>(expr)) {
+        size_t idx = currentChunk_->addConstant(Value(ValueType::FUNCTION, fnExpr->name));
+        currentChunk_->emitOp(OpCode::OP_CONSTANT, fnExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(idx), fnExpr->line);
         return;
     }
 

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Value.hpp"
 #include <string>
@@ -6,7 +6,7 @@
 
 class StandardLibrary {
 public:
-    static void print(const std::vector<Value>& args);
+    static Value print(const std::vector<Value>& args);
     static Value readFile(const std::string& path);
     static Value writeFile(const std::string& path, const std::string& content);
     static Value httpGet(const std::string& url);

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "AST.hpp"
 #include "Bytecode.hpp"
@@ -30,6 +30,7 @@ private:
     void compileStmt(Stmt* stmt);
     void compileBlock(BlockStmt* block);
     void compileExpr(Expr* expr);
+    void compileBlockAsExpr(BlockStmt* block, int line = 1);
 
     int resolveLocal(const std::string& name);
     void addLocal(const std::string& name);

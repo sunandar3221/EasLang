@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Token.hpp"
 #include "Value.hpp"
@@ -113,6 +113,32 @@ public:
     std::vector<std::unique_ptr<Stmt>> statements;
     BlockStmt(std::vector<std::unique_ptr<Stmt>> stmts = {}, int l = 0, int c = 0)
         : Stmt(l, c), statements(std::move(stmts)) {}
+};
+
+class LoopExpr : public Expr {
+public:
+    std::unique_ptr<Expr> count;
+    std::unique_ptr<BlockStmt> body;
+    LoopExpr(std::unique_ptr<Expr> cnt, std::unique_ptr<BlockStmt> b, int l = 0, int c = 0)
+        : Expr(l, c), count(std::move(cnt)), body(std::move(b)) {}
+};
+
+class IfExpr : public Expr {
+public:
+    std::unique_ptr<Expr> condition;
+    std::unique_ptr<BlockStmt> thenBranch;
+    std::unique_ptr<BlockStmt> elseBranch;
+    IfExpr(std::unique_ptr<Expr> cond, std::unique_ptr<BlockStmt> thenB, std::unique_ptr<BlockStmt> elseB = nullptr, int l = 0, int c = 0)
+        : Expr(l, c), condition(std::move(cond)), thenBranch(std::move(thenB)), elseBranch(std::move(elseB)) {}
+};
+
+class FnExpr : public Expr {
+public:
+    std::string name;
+    std::vector<std::string> params;
+    std::unique_ptr<BlockStmt> body;
+    FnExpr(std::string n, std::vector<std::string> p, std::unique_ptr<BlockStmt> b, int l = 0, int c = 0)
+        : Expr(l, c), name(std::move(n)), params(std::move(p)), body(std::move(b)) {}
 };
 
 class ExprStmt : public Stmt {

@@ -1,4 +1,4 @@
-nama = "Budi"
-umur = 17
+halo = loop 3000
+    print "Pengulangan loop"
 
-print nama + umur
+write "hai.txt" halo

@@ -13,7 +13,8 @@ enum class ValueType {
     FLOAT,
     STRING,
     LIST,
-    OBJECT
+    OBJECT,
+    FUNCTION
 };
 
 class Value {
@@ -33,6 +34,7 @@ public:
     Value(double f);
     Value(std::string s);
     Value(const char* s);
+    Value(ValueType t, std::string s);
     Value(std::vector<Value> list);
     Value(std::unordered_map<std::string, Value> obj);
 
@@ -56,6 +58,7 @@ public:
     bool isString() const;
     bool isList() const;
     bool isObject() const;
+    bool isFunction() const;
 
     bool isTruthy() const;
     double asFloat() const;

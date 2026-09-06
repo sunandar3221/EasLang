@@ -1,7 +1,7 @@
-﻿#include "Parser.hpp"
+#include "Parser.hpp"
 
 Parser::Parser(std::vector<Token> tokens)
-    : tokens_(std::move(tokens)), cursor_(0) {
+    : tokens_(std::move(tokens)), cursor_(0), anonFnCounter_(0) {
     functionArity_["read"] = 1;
     functionArity_["write"] = 2;
     functionArity_["app"] = 1;
@@ -64,6 +64,10 @@ std::unique_ptr<BlockStmt> Parser::parseProgram() {
             block->statements.push_back(std::move(stmt));
         }
     }
+    for (auto& fn : hoistedAnonFns_) {
+        block->statements.insert(block->statements.begin(), std::move(fn));
+    }
+    hoistedAnonFns_.clear();
     return block;
 }
 
@@ -125,7 +129,13 @@ std::unique_ptr<Stmt> Parser::parsePrint() {
     std::vector<std::unique_ptr<Expr>> args;
 
     while (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) && !isAtEnd()) {
-        args.push_back(parseExpression());
+        match(TokenType::COMMA);
+        if (check(TokenType::NEWLINE) || check(TokenType::DEDENT) || check(TokenType::END) || isAtEnd()) break;
+        auto expr = parseExpression();
+        if (expr) {
+            args.push_back(std::move(expr));
+        }
+        match(TokenType::COMMA);
     }
     match(TokenType::NEWLINE);
     return std::make_unique<PrintStmt>(std::move(args), line);
@@ -231,7 +241,48 @@ std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {
     if (check(TokenType::IDENTIFIER) && peekNext().type == TokenType::ASSIGN) {
         std::string name = advance().lexeme;
         advance();
+        skipNewlines();
+        if (check(TokenType::LOOP)) {
+            int loopLine = advance().line;
+            auto count = parseExpression();
+            match(TokenType::NEWLINE);
+            auto body = parseBlock();
+            return std::make_unique<AssignStmt>(std::move(name), std::make_unique<LoopExpr>(std::move(count), std::move(body), loopLine), line);
+        }
+        if (check(TokenType::IF)) {
+            int ifLine = advance().line;
+            auto condition = parseExpression();
+            match(TokenType::NEWLINE);
+            auto thenBranch = parseBlock();
+            skipNewlines();
+            std::unique_ptr<BlockStmt> elseBranch = nullptr;
+            if (match(TokenType::ELSE)) {
+                match(TokenType::NEWLINE);
+                elseBranch = parseBlock();
+            }
+            return std::make_unique<AssignStmt>(std::move(name), std::make_unique<IfExpr>(std::move(condition), std::move(thenBranch), std::move(elseBranch), ifLine), line);
+        }
+        if (check(TokenType::FN)) {
+            int fnLine = advance().line;
+            std::vector<std::string> params;
+            while (check(TokenType::IDENTIFIER)) {
+                params.push_back(advance().lexeme);
+            }
+            std::string fnName = "$anon_" + std::to_string(anonFnCounter_++);
+            functionArity_[fnName] = static_cast<int>(params.size());
+            functionArity_[name] = static_cast<int>(params.size());
+            match(TokenType::NEWLINE);
+            auto body = parseBlock();
+            hoistedAnonFns_.push_back(std::make_unique<FnDeclStmt>(fnName, params, std::make_unique<BlockStmt>(std::move(body->statements)), fnLine));
+            return std::make_unique<AssignStmt>(std::move(name), std::make_unique<VarExpr>(fnName, fnLine), line);
+        }
         auto val = parseExpression();
+        if (auto* varExp = dynamic_cast<VarExpr*>(val.get())) {
+            auto it = functionArity_.find(varExp->name);
+            if (it != functionArity_.end()) {
+                functionArity_[name] = it->second;
+            }
+        }
         match(TokenType::NEWLINE);
         return std::make_unique<AssignStmt>(std::move(name), std::move(val), line);
     }
@@ -388,6 +439,10 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
         if (it != functionArity_.end()) {
             advance();
             int arity = it->second;
+            if (check(TokenType::NEWLINE) || check(TokenType::COMMA) || check(TokenType::RPAREN) ||
+                check(TokenType::RBRACKET) || check(TokenType::DEDENT) || check(TokenType::END) || isAtEnd()) {
+                return std::make_unique<VarExpr>(id);
+            }
             std::vector<std::unique_ptr<Expr>> args;
             if (match(TokenType::LPAREN)) {
                 for (int i = 0; i < arity; ++i) {

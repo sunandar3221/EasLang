@@ -97,7 +97,12 @@ Value VM::run(Chunk* chunk) {
                 if (it != globals_.end()) {
                     *top++ = it->second;
                 } else {
-                    *top++ = Value();
+                    auto fit = functions_.find(name);
+                    if (fit != functions_.end()) {
+                        *top++ = Value(ValueType::FUNCTION, name);
+                    } else {
+                        *top++ = Value();
+                    }
                 }
                 break;
             }
@@ -324,8 +329,7 @@ Value VM::run(Chunk* chunk) {
                         args.push_back(*(top - argCount + i));
                     }
                     top -= argCount;
-                    StandardLibrary::print(args);
-                    *top++ = Value();
+                    *top++ = StandardLibrary::print(args);
                 } else if (name == "read") {
                     Value path = *(--top);
                     *top++ = StandardLibrary::readFile(path.toString());
@@ -359,7 +363,12 @@ Value VM::run(Chunk* chunk) {
                     int timeout = argCount > 0 ? static_cast<int>((*(--top)).asInt()) : -1;
                     *top++ = StandardLibrary::runApp(timeout);
                 } else {
-                    auto it = functions_.find(name);
+                    std::string targetName = name;
+                    auto git = globals_.find(name);
+                    if (git != globals_.end() && git->second.isFunction()) {
+                        targetName = git->second.strVal;
+                    }
+                    auto it = functions_.find(targetName);
                     if (it != functions_.end()) {
                         frame->ip = ip;
                         Chunk* nChunk = it->second.get();
@@ -406,7 +415,7 @@ Value VM::run(Chunk* chunk) {
                     args.push_back(*(top - argCount + i));
                 }
                 top -= argCount;
-                StandardLibrary::print(args);
+                *top++ = StandardLibrary::print(args);
                 break;
             }
             case OpCode::OP_WRITE: {

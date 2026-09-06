@@ -27,13 +27,15 @@ static LRESULT CALLBACK EasWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
     }
 }
 
-void StandardLibrary::print(const std::vector<Value>& args) {
+Value StandardLibrary::print(const std::vector<Value>& args) {
+    std::string out;
     for (size_t i = 0; i < args.size(); ++i) {
-        if (i > 0) std::cout << " ";
-        std::cout << args[i].toString();
+        if (i > 0) out += " ";
+        out += args[i].toString();
     }
-    std::cout << "\n";
+    std::cout << out << "\n";
     std::cout.flush();
+    return Value(out + "\n");
 }
 
 Value StandardLibrary::readFile(const std::string& path) {

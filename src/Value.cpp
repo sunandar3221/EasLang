@@ -1,4 +1,4 @@
-﻿#include "Value.hpp"
+#include "Value.hpp"
 #include <sstream>
 #include <cmath>
 #include <stdexcept>
@@ -24,6 +24,9 @@ Value::Value(std::string s)
 Value::Value(const char* s)
     : type(ValueType::STRING), boolVal(s && s[0] != '\0'), intVal(0), floatVal(0.0), strVal(s ? s : "") {}
 
+Value::Value(ValueType t, std::string s)
+    : type(t), boolVal(true), intVal(0), floatVal(0.0), strVal(std::move(s)) {}
+
 Value::Value(std::vector<Value> list)
     : type(ValueType::LIST), boolVal(true), intVal(0), floatVal(0.0), listVal(std::make_shared<std::vector<Value>>(std::move(list))) {}
 
@@ -32,7 +35,7 @@ Value::Value(std::unordered_map<std::string, Value> obj)
 
 Value::Value(const Value& other)
     : type(other.type), boolVal(other.boolVal), intVal(other.intVal), floatVal(other.floatVal) {
-    if (type == ValueType::STRING) strVal = other.strVal;
+    if (type == ValueType::STRING || type == ValueType::FUNCTION) strVal = other.strVal;
     else if (type == ValueType::LIST) listVal = other.listVal;
     else if (type == ValueType::OBJECT) objVal = other.objVal;
 }
@@ -47,7 +50,7 @@ Value& Value::operator=(const Value& other) {
     boolVal = other.boolVal;
     intVal = other.intVal;
     floatVal = other.floatVal;
-    if (type == ValueType::STRING) {
+    if (type == ValueType::STRING || type == ValueType::FUNCTION) {
         strVal = other.strVal;
         listVal.reset();
         objVal.reset();
@@ -95,6 +98,7 @@ bool Value::isNumber() const { return type == ValueType::INT || type == ValueTyp
 bool Value::isString() const { return type == ValueType::STRING; }
 bool Value::isList() const { return type == ValueType::LIST; }
 bool Value::isObject() const { return type == ValueType::OBJECT; }
+bool Value::isFunction() const { return type == ValueType::FUNCTION; }
 
 bool Value::isTruthy() const {
     switch (type) {
@@ -105,6 +109,7 @@ bool Value::isTruthy() const {
         case ValueType::STRING: return !strVal.empty();
         case ValueType::LIST: return listVal && !listVal->empty();
         case ValueType::OBJECT: return objVal && !objVal->empty();
+        case ValueType::FUNCTION: return !strVal.empty();
         default: return false;
     }
 }
@@ -140,6 +145,7 @@ std::string Value::toString() const {
             return ss.str();
         }
         case ValueType::STRING: return strVal;
+        case ValueType::FUNCTION: return "<function " + strVal + ">";
         case ValueType::LIST: {
             if (!listVal) return "[]";
             std::string s = "[";
