@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <cstdint>
 
 enum class TokenType {
     END_OF_FILE,

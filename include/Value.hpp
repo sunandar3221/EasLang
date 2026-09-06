@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <iostream>
+#include <cstdint>
 
 enum class ValueType {
     NIL,

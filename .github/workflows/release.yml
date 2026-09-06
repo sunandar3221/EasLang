@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Compile Windows Binary
+        shell: bash
         run: |
           g++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas-windows-x64.exe
           cp eas-windows-x64.exe eas.exe
