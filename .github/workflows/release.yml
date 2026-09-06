@@ -1,0 +1,106 @@
+name: Build and Release EasLang
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Compile Windows Binary
+        run: |
+          g++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas-windows-x64.exe
+          cp eas-windows-x64.exe eas.exe
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binaries
+          path: |
+            eas-windows-x64.exe
+            eas.exe
+
+  build-linux-and-android:
+    name: Build Linux & Android (Termux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential g++ g++-aarch64-linux-gnu
+
+      - name: Compile Linux x86_64 Binaries
+        run: |
+          g++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -o eas-linux-x64
+          g++ -std=c++20 -O3 -flto -static src/*.cpp -Iinclude -o eas-linux-x64-static
+          chmod +x eas-linux-x64 eas-linux-x64-static
+
+      - name: Compile Linux ARM64 Static Binary
+        run: |
+          aarch64-linux-gnu-g++ -std=c++20 -O3 -flto -static src/*.cpp -Iinclude -o eas-linux-arm64-static
+          chmod +x eas-linux-arm64-static
+
+      - name: Compile Android Termux ARM64 Native Binary
+        run: |
+          NDK_DIR=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+          echo "Found Android NDK at: $NDK_DIR"
+          $NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -o eas-android-arm64
+          chmod +x eas-android-arm64
+
+      - name: Upload Linux and Android Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-android-binaries
+          path: |
+            eas-linux-x64
+            eas-linux-x64-static
+            eas-linux-arm64-static
+            eas-android-arm64
+
+  release:
+    name: Publish Release Assets
+    needs: [build-windows, build-linux-and-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: dist
+
+      - name: Download Linux & Android Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-android-binaries
+          path: dist
+
+      - name: Determine Tag Name
+        id: tag_info
+        run: |
+          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v1.0.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ steps.tag_info.outputs.tag }} dist/* --clobber || gh release create ${{ steps.tag_info.outputs.tag }} dist/* --title "EasLang ${{ steps.tag_info.outputs.tag }}" --notes "Multi-platform prebuilt binaries for Windows, Linux, and Android (Termux)."

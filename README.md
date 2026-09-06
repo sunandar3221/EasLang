@@ -251,11 +251,35 @@ Menguji performa operasi perulangan dan aritmatika intensif berskala besar:
 
 ---
 
-## 5. Panduan Build & Eksekusi
+## 5. Panduan Instalasi & Eksekusi
 
-### Kompilasi Compiler (`eas.exe`)
-Kompilasi source code compiler menggunakan g++ dengan standar C++20 dan optimasi native:
+### 🚀 Cara Instalasi Cepat (Prebuilt Binaries via GitHub Actions)
+Seluruh binary prebuilt untuk berbagai platform (Linux x86_64, Linux ARM64, Android Termux, dan Windows) otomatis dikompilasi oleh **GitHub Actions**. Anda tidak perlu repot melakukan kompilasi manual!
 
+#### 🐧 Linux (Ubuntu / Debian / Arch / Fedora)
+```bash
+curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
+```
+
+#### 📱 Android (Termux)
+```bash
+pkg update && pkg install curl -y
+curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
+```
+
+#### 🪟 Windows
+Unduh langsung berkas `eas.exe` dari [Halaman Rilis GitHub](https://github.com/sunandar3221/EasLang/releases/latest).
+
+---
+
+### Kompilasi Manual dari Source Code
+
+#### Di Linux / macOS / Termux:
+```bash
+make
+```
+
+#### Di Windows (MinGW / GCC):
 ```bash
 g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas.exe
 ```

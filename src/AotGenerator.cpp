@@ -417,7 +417,11 @@ std::string AotGenerator::generateCpp(BlockStmt* program) {
 }
 
 bool AotGenerator::buildBinary(const std::string& sourceFile, const std::string& outputFile) {
+#ifdef _WIN32
     std::string cmd = "g++ -std=c++20 -O3 -march=native -flto " + sourceFile + " src/Value.cpp src/StandardLibrary.cpp -Iinclude -lwininet -lgdi32 -luser32 -o " + outputFile;
+#else
+    std::string cmd = "g++ -std=c++20 -O3 -march=native -flto " + sourceFile + " src/Value.cpp src/StandardLibrary.cpp -Iinclude -o " + outputFile;
+#endif
     int res = std::system(cmd.c_str());
     std::remove(sourceFile.c_str());
     return res == 0;
