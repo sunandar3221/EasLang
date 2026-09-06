@@ -25,10 +25,9 @@ Proyek ini dilisensikan di bawah **MIT License**.
   - Bebas dari keyword `return` (ekspresi terakhir yang dievaluasi otomatis menjadi nilai balik fungsi)
   - Tanpa deklarasi tipe data wajib yang bertele-tele
   - Blok kode berbasis baris dan indentasi alami (dengan opsi penutup blok `end`)
-- **Low-Machine Architecture & Dual-Engine**:
-  - **Low-Machine Native Runner (Default CLI)**: Menjalankan skrip `.eas` langsung pada kecepatan instruksi mesin tingkat rendah (*low-machine code*). Memanfaatkan *smart binary caching* (`.eas_cache/`) dengan kompilasi otomatis berbasis C++20 register-level arithmetic (`-O3 -march=native -flto`), sehingga skrip berjalan dalam hitungan milidetik dan mengalahkan Python telak (hingga **8x - 38x lebih cepat**).
-  - **Flat-Stack Bytecode Virtual Machine (`--vm`)**: Engine interpretasi cepat untuk lingkungan tanpa compiler eksternal atau eksekusi instan tanpa file binary.
-  - **Ahead-Of-Time (AOT) Compiler Backend (`eas build`)**: Menghasilkan file binary `.exe` native mandiri yang siap didistribusikan tanpa dependensi runtime.
+- **Arsitektur Zero-Disk-Cache & Dual-Engine**:
+  - **In-Memory Flat-Stack Execution (Default CLI)**: Menjalankan skrip `.eas` langsung secara murni di dalam memori tanpa membuat berkas cache di disk (*zero storage bloat*). Menghasilkan eksekusi instan (0 ms compile time) dengan dispatch opcodes dan in-place register updates yang sangat cepat.
+  - **Ahead-Of-Time (AOT) Compiler Backend (`eas build`)**: Mengompilasi skrip `.eas` langsung menjadi berkas binary `.exe` native mandiri menggunakan optimasi agresif `-O3 -march=native -flto` tanpa dependensi runtime.
 - **Manajemen Memori Deterministik (Zero GC Overhead)**:
   - Menggunakan model Zero-Cost RAII sehingga alokasi dan dealokasi memori terjadi seketika tanpa jeda *stop-the-world garbage collection*.
 - **Batteries-Included Standard Library**:
@@ -250,21 +249,14 @@ Kompilasi source code compiler menggunakan g++ dengan standar C++20 dan optimasi
 g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas.exe
 ```
 
-### 1. Eksekusi Skrip Low-Machine (Default CLI Mode)
-Jalankan berkas skrip `.eas` secara langsung. Engine otomatis mengeksekusi dengan kecepatan kode mesin asli (*low-machine code*) melalui *smart binary cache*:
+### 1. Eksekusi Skrip Instan Tanpa Cache (Default CLI Mode)
+Jalankan berkas skrip `.eas` secara langsung. Engine mengeksekusi secara instan di dalam memori tanpa meninggalkan berkas cache di penyimpanan disk (*zero disk cache*):
 
 ```bash
 .\eas.exe script.eas
 ```
 
-### 2. Mode Virtual Machine (`--vm`)
-Jalankan berkas skrip menggunakan Flat-Stack Bytecode Virtual Machine:
-
-```bash
-.\eas.exe --vm script.eas
-```
-
-### 3. Kompilasi AOT ke Executable Mandiri
+### 2. Kompilasi AOT ke Executable Mandiri (`build`)
 Kompilasi skrip `.eas` langsung menjadi binary executable `.exe` native mandiri yang teroptimasi penuh tanpa dependensi runtime:
 
 ```bash
@@ -272,7 +264,7 @@ Kompilasi skrip `.eas` langsung menjadi binary executable `.exe` native mandiri 
 .\program.exe
 ```
 
-### 4. Mode Interaktif (Interactive REPL)
+### 3. Mode Interaktif (Interactive REPL)
 Jalankan `eas.exe` tanpa argumen untuk masuk ke interactive shell:
 
 ```bash

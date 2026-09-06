@@ -143,14 +143,22 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_DIV: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
-                a = a / b;
+                if (a.type == ValueType::INT && b.type == ValueType::INT && b.intVal != 0 && (a.intVal % b.intVal == 0)) {
+                    a.intVal /= b.intVal;
+                } else {
+                    a = a / b;
+                }
                 top--;
                 break;
             }
             case OpCode::OP_MOD: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
-                a = a % b;
+                if (a.type == ValueType::INT && b.type == ValueType::INT && b.intVal != 0) {
+                    a.intVal %= b.intVal;
+                } else {
+                    a = a % b;
+                }
                 top--;
                 break;
             }
@@ -167,20 +175,38 @@ Value VM::run(Chunk* chunk) {
             }
             case OpCode::OP_NOT: {
                 Value& a = *(top - 1);
-                a = Value(!a.isTruthy());
+                bool b = !a.isTruthy();
+                a.type = ValueType::BOOL;
+                a.boolVal = b;
+                a.intVal = b ? 1 : 0;
+                a.floatVal = b ? 1.0 : 0.0;
                 break;
             }
             case OpCode::OP_EQUAL: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
-                a = Value(a == b);
+                if (a.type == ValueType::INT && b.type == ValueType::INT) {
+                    a.type = ValueType::BOOL;
+                    a.boolVal = (a.intVal == b.intVal);
+                    a.intVal = a.boolVal ? 1 : 0;
+                    a.floatVal = a.boolVal ? 1.0 : 0.0;
+                } else {
+                    a = Value(a == b);
+                }
                 top--;
                 break;
             }
             case OpCode::OP_NOT_EQUAL: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
-                a = Value(a != b);
+                if (a.type == ValueType::INT && b.type == ValueType::INT) {
+                    a.type = ValueType::BOOL;
+                    a.boolVal = (a.intVal != b.intVal);
+                    a.intVal = a.boolVal ? 1 : 0;
+                    a.floatVal = a.boolVal ? 1.0 : 0.0;
+                } else {
+                    a = Value(a != b);
+                }
                 top--;
                 break;
             }
@@ -188,7 +214,10 @@ Value VM::run(Chunk* chunk) {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
-                    a = Value(a.intVal < b.intVal);
+                    a.type = ValueType::BOOL;
+                    a.boolVal = (a.intVal < b.intVal);
+                    a.intVal = a.boolVal ? 1 : 0;
+                    a.floatVal = a.boolVal ? 1.0 : 0.0;
                 } else {
                     a = Value(a < b);
                 }
@@ -199,7 +228,10 @@ Value VM::run(Chunk* chunk) {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
-                    a = Value(a.intVal <= b.intVal);
+                    a.type = ValueType::BOOL;
+                    a.boolVal = (a.intVal <= b.intVal);
+                    a.intVal = a.boolVal ? 1 : 0;
+                    a.floatVal = a.boolVal ? 1.0 : 0.0;
                 } else {
                     a = Value(a <= b);
                 }
@@ -210,7 +242,10 @@ Value VM::run(Chunk* chunk) {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
-                    a = Value(a.intVal > b.intVal);
+                    a.type = ValueType::BOOL;
+                    a.boolVal = (a.intVal > b.intVal);
+                    a.intVal = a.boolVal ? 1 : 0;
+                    a.floatVal = a.boolVal ? 1.0 : 0.0;
                 } else {
                     a = Value(a > b);
                 }
@@ -221,7 +256,10 @@ Value VM::run(Chunk* chunk) {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
-                    a = Value(a.intVal >= b.intVal);
+                    a.type = ValueType::BOOL;
+                    a.boolVal = (a.intVal >= b.intVal);
+                    a.intVal = a.boolVal ? 1 : 0;
+                    a.floatVal = a.boolVal ? 1.0 : 0.0;
                 } else {
                     a = Value(a >= b);
                 }

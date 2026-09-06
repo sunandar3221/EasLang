@@ -1,0 +1,4 @@
+nama = "Budi"
+umur = 17
+
+print nama + umur
