@@ -1,0 +1,19 @@
+﻿fn computeSum limit
+    total = 0
+    i = 0
+    while i < limit
+        total = total + i
+        i = i + 1
+    total
+
+res = computeSum 2000000
+print res
+
+fn fib n
+    if n <= 1
+        n
+    else
+        (fib (n - 1)) + (fib (n - 2))
+
+fibRes = fib 28
+print fibRes

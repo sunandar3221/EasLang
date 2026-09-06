@@ -1,0 +1,362 @@
+﻿#include "Interpreter.hpp"
+#include "Lexer.hpp"
+#include "Parser.hpp"
+
+Interpreter::Interpreter()
+    : globalEnv_(std::make_shared<Environment>()),
+      currentEnv_(globalEnv_) {
+    registerBuiltins();
+}
+
+Interpreter::Interpreter(std::shared_ptr<Environment> env)
+    : globalEnv_(std::move(env)),
+      currentEnv_(globalEnv_) {
+    registerBuiltins();
+}
+
+void Interpreter::registerBuiltins() {
+    globalEnv_->define("true", Value(true));
+    globalEnv_->define("false", Value(false));
+    globalEnv_->define("nil", Value());
+}
+
+std::shared_ptr<Environment> Interpreter::getGlobalEnvironment() const {
+    return globalEnv_;
+}
+
+Value Interpreter::interpret(BlockStmt* program) {
+    if (!program) return Value();
+    return executeBlock(program, currentEnv_);
+}
+
+Value Interpreter::executeBlock(BlockStmt* block, std::shared_ptr<Environment> env) {
+    if (!block) return Value();
+    std::shared_ptr<Environment> previous = currentEnv_;
+    if (env) {
+        currentEnv_ = env;
+    }
+    Value lastValue;
+    for (const auto& stmt : block->statements) {
+        lastValue = execute(stmt.get());
+    }
+    currentEnv_ = previous;
+    return lastValue;
+}
+
+Value Interpreter::execute(Stmt* stmt) {
+    if (!stmt) return Value();
+
+    if (auto* exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
+        return evaluate(exprStmt->expression.get());
+    }
+
+    if (auto* assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
+        Value val = evaluate(assignStmt->value.get());
+        currentEnv_->assign(assignStmt->name, val);
+        return val;
+    }
+
+    if (auto* idxAssign = dynamic_cast<IndexAssignStmt*>(stmt)) {
+        Value targetVal = evaluate(idxAssign->target.get());
+        Value idxVal = evaluate(idxAssign->index.get());
+        Value val = evaluate(idxAssign->value.get());
+        targetVal.setIndex(idxVal, val);
+        return val;
+    }
+
+    if (auto* ifStmt = dynamic_cast<IfStmt*>(stmt)) {
+        Value condVal = evaluate(ifStmt->condition.get());
+        if (condVal.isTruthy()) {
+            return executeBlock(ifStmt->thenBranch.get(), currentEnv_);
+        } else if (ifStmt->elseBranch) {
+            return executeBlock(ifStmt->elseBranch.get(), currentEnv_);
+        }
+        return Value();
+    }
+
+    if (auto* loopStmt = dynamic_cast<LoopStmt*>(stmt)) {
+        Value cntVal = evaluate(loopStmt->count.get());
+        int64_t n = cntVal.asInt();
+        Value lastVal;
+        for (int64_t i = 0; i < n; ++i) {
+            lastVal = executeBlock(loopStmt->body.get(), currentEnv_);
+        }
+        return lastVal;
+    }
+
+    if (auto* whileStmt = dynamic_cast<WhileStmt*>(stmt)) {
+        Value lastVal;
+        while (evaluate(whileStmt->condition.get()).isTruthy()) {
+            lastVal = executeBlock(whileStmt->body.get(), currentEnv_);
+        }
+        return lastVal;
+    }
+
+    if (auto* fnDecl = dynamic_cast<FnDeclStmt*>(stmt)) {
+        FunctionDef fnDef;
+        fnDef.name = fnDecl->name;
+        fnDef.params = fnDecl->params;
+        fnDef.body = std::shared_ptr<BlockStmt>(std::move(fnDecl->body));
+        fnDef.closure = currentEnv_;
+        currentEnv_->defineFunction(fnDef.name, fnDef);
+        return Value();
+    }
+
+    if (auto* printStmt = dynamic_cast<PrintStmt*>(stmt)) {
+        std::vector<Value> args;
+        for (const auto& a : printStmt->arguments) {
+            args.push_back(evaluate(a.get()));
+        }
+        StandardLibrary::print(args);
+        return Value();
+    }
+
+    if (auto* writeStmt = dynamic_cast<WriteStmt*>(stmt)) {
+        Value pathVal = evaluate(writeStmt->path.get());
+        Value contentVal = evaluate(writeStmt->content.get());
+        return StandardLibrary::writeFile(pathVal.toString(), contentVal.toString());
+    }
+
+    if (auto* appStmt = dynamic_cast<AppStmt*>(stmt)) {
+        Value titleVal = evaluate(appStmt->title.get());
+        StandardLibrary::setAppTitle(titleVal.toString());
+        return Value();
+    }
+
+    if (auto* winStmt = dynamic_cast<WindowStmt*>(stmt)) {
+        Value wVal = evaluate(winStmt->width.get());
+        Value hVal = evaluate(winStmt->height.get());
+        StandardLibrary::setWindowSize(static_cast<int>(wVal.asInt()), static_cast<int>(hVal.asInt()));
+        return Value();
+    }
+
+    if (auto* runStmt = dynamic_cast<RunStmt*>(stmt)) {
+        int timeout = -1;
+        if (runStmt->duration) {
+            timeout = static_cast<int>(evaluate(runStmt->duration.get()).asInt());
+        }
+        return StandardLibrary::runApp(timeout);
+    }
+
+    if (auto* setStmt = dynamic_cast<SetStmt*>(stmt)) {
+        Value targetVal = evaluate(setStmt->target.get());
+        Value propVal = evaluate(setStmt->property.get());
+        Value val = evaluate(setStmt->value.get());
+        targetVal.setProperty(propVal.toString(), val);
+        return val;
+    }
+
+    if (auto* useStmt = dynamic_cast<UseStmt*>(stmt)) {
+        std::string filename = useStmt->moduleName;
+        if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
+            filename += ".eas";
+        }
+        Value fileContent = StandardLibrary::readFile(filename);
+        if (fileContent.strVal.empty()) {
+            return Value(false);
+        }
+        Lexer modLexer(fileContent.strVal);
+        auto modTokens = modLexer.tokenize();
+        Parser modParser(std::move(modTokens));
+        auto modAst = modParser.parseProgram();
+        return interpret(modAst.get());
+    }
+
+    if (auto* blockStmt = dynamic_cast<BlockStmt*>(stmt)) {
+        return executeBlock(blockStmt, currentEnv_);
+    }
+
+    return Value();
+}
+
+Value Interpreter::evaluate(Expr* expr) {
+    if (!expr) return Value();
+
+    if (auto* lit = dynamic_cast<LiteralExpr*>(expr)) {
+        return lit->value;
+    }
+
+    if (auto* var = dynamic_cast<VarExpr*>(expr)) {
+        Value val;
+        if (currentEnv_->get(var->name, val)) {
+            return val;
+        }
+        return Value();
+    }
+
+    if (auto* listLit = dynamic_cast<ListLiteralExpr*>(expr)) {
+        std::vector<Value> elems;
+        for (const auto& el : listLit->elements) {
+            elems.push_back(evaluate(el.get()));
+        }
+        return Value(elems);
+    }
+
+    if (auto* idxExpr = dynamic_cast<IndexExpr*>(expr)) {
+        Value targetVal = evaluate(idxExpr->target.get());
+        Value indexVal = evaluate(idxExpr->index.get());
+        return targetVal.getIndex(indexVal);
+    }
+
+    if (auto* bin = dynamic_cast<BinaryExpr*>(expr)) {
+        Value left = evaluate(bin->left.get());
+        Value right = evaluate(bin->right.get());
+
+        switch (bin->op) {
+            case TokenType::PLUS: return left + right;
+            case TokenType::MINUS: return left - right;
+            case TokenType::STAR: return left * right;
+            case TokenType::SLASH: return left / right;
+            case TokenType::PERCENT: return left % right;
+            case TokenType::EQUAL_EQUAL: return Value(left == right);
+            case TokenType::BANG_EQUAL: return Value(left != right);
+            case TokenType::LESS: return Value(left < right);
+            case TokenType::GREATER: return Value(left > right);
+            case TokenType::LESS_EQUAL: return Value(left <= right);
+            case TokenType::GREATER_EQUAL: return Value(left >= right);
+            case TokenType::AND: return Value(left.isTruthy() && right.isTruthy());
+            case TokenType::OR: return Value(left.isTruthy() || right.isTruthy());
+            default: return Value();
+        }
+    }
+
+    if (auto* un = dynamic_cast<UnaryExpr*>(expr)) {
+        Value right = evaluate(un->right.get());
+        if (un->op == TokenType::MINUS) {
+            return Value(static_cast<int64_t>(0)) - right;
+        }
+        if (un->op == TokenType::NOT) {
+            return Value(!right.isTruthy());
+        }
+        return right;
+    }
+
+    if (auto* call = dynamic_cast<CallExpr*>(expr)) {
+        const std::string& name = call->callee;
+
+        if (name == "len" && !call->arguments.empty()) {
+            Value arg = evaluate(call->arguments[0].get());
+            if (arg.isList()) return Value(static_cast<int64_t>(arg.listVal ? arg.listVal->size() : 0));
+            if (arg.isString()) return Value(static_cast<int64_t>(arg.strVal.size()));
+            if (arg.isObject()) return Value(static_cast<int64_t>(arg.objVal ? arg.objVal->size() : 0));
+            return Value(static_cast<int64_t>(0));
+        }
+
+        if (name == "push" && call->arguments.size() >= 2) {
+            Value target = evaluate(call->arguments[0].get());
+            Value val = evaluate(call->arguments[1].get());
+            if (target.isList()) {
+                if (!target.listVal) target.listVal = std::make_shared<std::vector<Value>>();
+                target.listVal->push_back(val);
+            }
+            return val;
+        }
+
+        if (name == "pop" && !call->arguments.empty()) {
+            Value target = evaluate(call->arguments[0].get());
+            if (target.isList() && target.listVal && !target.listVal->empty()) {
+                Value popped = target.listVal->back();
+                target.listVal->pop_back();
+                return popped;
+            }
+            return Value();
+        }
+
+        if (name == "str" && !call->arguments.empty()) {
+            return Value(evaluate(call->arguments[0].get()).toString());
+        }
+
+        if (name == "int" && !call->arguments.empty()) {
+            return Value(evaluate(call->arguments[0].get()).asInt());
+        }
+
+        if (name == "float" && !call->arguments.empty()) {
+            return Value(evaluate(call->arguments[0].get()).asFloat());
+        }
+
+        if (name == "print") {
+            std::vector<Value> args;
+            for (const auto& a : call->arguments) args.push_back(evaluate(a.get()));
+            StandardLibrary::print(args);
+            return Value();
+        }
+
+        if (name == "read" && !call->arguments.empty()) {
+            return StandardLibrary::readFile(evaluate(call->arguments[0].get()).toString());
+        }
+
+        if (name == "write" && call->arguments.size() >= 2) {
+            return StandardLibrary::writeFile(evaluate(call->arguments[0].get()).toString(), evaluate(call->arguments[1].get()).toString());
+        }
+
+        if (name == "get") {
+            if (call->arguments.size() == 1) {
+                return StandardLibrary::httpGet(evaluate(call->arguments[0].get()).toString());
+            } else if (call->arguments.size() >= 2) {
+                Value tgt = evaluate(call->arguments[0].get());
+                Value prop = evaluate(call->arguments[1].get());
+                return tgt.getProperty(prop.toString());
+            }
+            return Value();
+        }
+
+        if (name == "send" && call->arguments.size() >= 2) {
+            return StandardLibrary::httpSend(evaluate(call->arguments[0].get()).toString(), evaluate(call->arguments[1].get()).toString());
+        }
+
+        if (name == "app" && !call->arguments.empty()) {
+            StandardLibrary::setAppTitle(evaluate(call->arguments[0].get()).toString());
+            return Value();
+        }
+
+        if (name == "window" && call->arguments.size() >= 2) {
+            StandardLibrary::setWindowSize(static_cast<int>(evaluate(call->arguments[0].get()).asInt()), static_cast<int>(evaluate(call->arguments[1].get()).asInt()));
+            return Value();
+        }
+
+        if (name == "run") {
+            int t = call->arguments.empty() ? -1 : static_cast<int>(evaluate(call->arguments[0].get()).asInt());
+            return StandardLibrary::runApp(t);
+        }
+
+        FunctionDef fnDef;
+        if (currentEnv_->getFunction(name, fnDef)) {
+            auto callEnv = std::make_shared<Environment>(fnDef.closure);
+            for (size_t i = 0; i < fnDef.params.size() && i < call->arguments.size(); ++i) {
+                callEnv->define(fnDef.params[i], evaluate(call->arguments[i].get()));
+            }
+            return executeBlock(fnDef.body.get(), callEnv);
+        }
+
+        return Value();
+    }
+
+    if (auto* readExpr = dynamic_cast<ReadExpr*>(expr)) {
+        Value p = evaluate(readExpr->path.get());
+        return StandardLibrary::readFile(p.toString());
+    }
+
+    if (auto* getExpr = dynamic_cast<GetExpr*>(expr)) {
+        Value tgt = evaluate(getExpr->target.get());
+        if (getExpr->property) {
+            Value prop = evaluate(getExpr->property.get());
+            if (tgt.isObject()) {
+                return tgt.getProperty(prop.toString());
+            }
+            return tgt.getIndex(prop);
+        }
+        return StandardLibrary::httpGet(tgt.toString());
+    }
+
+    if (auto* sendExpr = dynamic_cast<SendExpr*>(expr)) {
+        Value tgt = evaluate(sendExpr->target.get());
+        Value d = evaluate(sendExpr->data.get());
+        return StandardLibrary::httpSend(tgt.toString(), d.toString());
+    }
+
+    if (dynamic_cast<NewExpr*>(expr)) {
+        return Value::makeObject();
+    }
+
+    return Value();
+}

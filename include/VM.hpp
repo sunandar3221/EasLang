@@ -1,0 +1,32 @@
+﻿#pragma once
+
+#include "Bytecode.hpp"
+#include "StandardLibrary.hpp"
+#include <unordered_map>
+#include <memory>
+#include <string>
+#include <vector>
+
+struct CallFrame {
+    Chunk* chunk;
+    size_t ip;
+    Value* slots;
+};
+
+class VM {
+public:
+    VM();
+
+    void registerFunction(const std::string& name, std::shared_ptr<Chunk> chunk);
+    void registerFunctions(const std::unordered_map<std::string, std::shared_ptr<Chunk>>& fns);
+    Value run(Chunk* chunk);
+
+private:
+    static constexpr size_t STACK_MAX = 262144;
+    static constexpr size_t FRAMES_MAX = 8192;
+
+    std::vector<Value> stack_;
+    std::vector<CallFrame> frames_;
+    std::unordered_map<std::string, Value> globals_;
+    std::unordered_map<std::string, std::shared_ptr<Chunk>> functions_;
+};

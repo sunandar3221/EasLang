@@ -1,0 +1,62 @@
+name = "Budi"
+age = 20
+print name
+print age
+
+val1 = 100
+val2 = 25
+sum = val1 + val2
+diff = val1 - val2
+prod = val1 * val2
+quot = val1 / val2
+print sum
+print diff
+print prod
+print quot
+
+names = ["Budi", "Andi", "Sari"]
+print names[0]
+print names[1]
+print names[2]
+
+if age >= 18
+    print "Adult"
+else
+    print "Child"
+
+minorAge = 15
+if minorAge >= 18
+    print "Adult"
+else
+    print "Minor"
+
+loop 3
+    print "Loop item"
+
+fn add a b
+    a + b
+print add 10 20
+
+fn multiply x y
+    x * y
+print multiply 6 7
+
+fn greet person
+    "Hello " + person
+print greet "EasLang"
+
+write "output_test.txt" "EasLang High-Performance File IO Completed"
+content = read "output_test.txt"
+print content
+
+person = new
+set person "role" "Engineer"
+print get person "role"
+
+res = get "httpbin.org"
+print res
+
+app "EasLang Native Desktop"
+window 800 600
+print "Desktop App Ready"
+run 200
