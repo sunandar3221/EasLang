@@ -2,6 +2,8 @@ name: Build and Release EasLang
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -20,7 +22,7 @@ jobs:
       - name: Compile Windows Binary
         shell: bash
         run: |
-          g++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas-windows-x64.exe
+          g++ -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas-windows-x64.exe
           cp eas-windows-x64.exe eas.exe
 
       - name: Upload Windows Artifacts
