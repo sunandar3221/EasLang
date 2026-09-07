@@ -1,4 +1,6 @@
 #include "Parser.hpp"
+#include "Lexer.hpp"
+#include "StandardLibrary.hpp"
 
 Parser::Parser(std::vector<Token> tokens)
     : tokens_(std::move(tokens)), cursor_(0), anonFnCounter_(0) {
@@ -272,6 +274,28 @@ std::unique_ptr<Stmt> Parser::parseUse() {
         mod = advance().lexeme;
     }
     match(TokenType::NEWLINE);
+    if (!mod.empty() && mod != "io" && mod != "math" && mod != "time" && mod != "net" && mod != "http" && mod != "gui") {
+        std::string filename = mod;
+        if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
+            filename += ".eas";
+        }
+        Value content = StandardLibrary::readFile(filename);
+        if (!content.strVal.empty()) {
+            Lexer subLex(content.strVal);
+            auto subToks = subLex.tokenize();
+            if (!subLex.hasErrors()) {
+                Parser subParser(std::move(subToks));
+                auto subAst = subParser.parseProgram();
+                if (subAst) {
+                    for (const auto& s : subAst->statements) {
+                        if (auto* fn = dynamic_cast<FnDeclStmt*>(s.get())) {
+                            functionArity_[fn->name] = static_cast<int>(fn->params.size());
+                        }
+                    }
+                }
+            }
+        }
+    }
     return std::make_unique<UseStmt>(std::move(mod), line);
 }
 

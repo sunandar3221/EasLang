@@ -235,12 +235,20 @@ print multiply 6 7
 
 Pemanggilan fungsi dapat ditulis dengan gaya perintah `add 10 20` maupun gaya kurung `add(10, 20)`.
 
-### Bab 7: Operasi Berkas (`read`, `write`)
-Standard library menyediakan pembacaan dan penulisan berkas langsung secara native.
+### Bab 7: Pustaka I/O & Input Interaktif (`use io`, `input`, `read`, `write`)
+Untuk menggunakan fitur input-output berkas dan interaksi pengguna, Anda **wajib** memuat pustaka `io` terlebih dahulu menggunakan `use io` atau `import io` (seperti halnya di Python).
 
 ```eas
-write "catatan.txt" "Belajar EasLang sangat mudah"
-isi = read "catatan.txt"
+use io
+
+nama = io.input("Siapa nama kamu? ")
+umur = input "Berapa umur kamu? "
+hobi = io.ask("Apa hobi kamu? ")
+
+io.print "Halo " + nama + ", umur " + umur + ", hobi " + hobi
+
+io.write "catatan.txt", "Belajar EasLang sangat menyenangkan"
+isi = io.read "catatan.txt"
 print isi
 ```
 
@@ -274,12 +282,97 @@ run 500
 ```
 *Catatan: `run` menerima parameter timeout dalam milidetik atau berjalan terus hingga jendela ditutup pengguna.*
 
-### Bab 11: Modularitas & Impor Modul (`use`)
-Muat kode dari file `.eas` lain ke dalam scope program saat ini:
+### Bab 11: Modularitas, Pustaka Bawaan & Cara Membuat Library Sendiri (`use` / `import`)
 
+EasLang mendukung sistem modularitas modern yang fleksibel menggunakan kata kunci `use` atau `import`.
+
+#### A. Menggunakan Library Bawaan (Built-in Standard Libraries)
+EasLang menyertakan pustaka standar bawaan berkecepatan tinggi:
+- **`io`**: Input/output berkas (`read`, `write`, `io.read`, `io.write`) dan input pengguna interaktif (`input`, `io.input`, `io.ask`). Wajib dimuat sebelum digunakan!
+- **`math`**: Operasi matematika presisi tinggi (`math.sqrt`, `math.abs`, `math.pow`, `math.pi`, dll.).
+- **`time`**: Operasi waktu dan jeda eksekusi (`time.now`, `time.sleep`).
+- **`net`** / **`http`**: Komunikasi jaringan dan request HTTP (`net.get`, `net.send`).
+- **`gui`**: Antarmuka grafis desktop native Win32 (`gui.app`, `gui.window`, `gui.run`).
+
+Contoh pemanggilan pustaka standar:
 ```eas
-use "matematika.eas"
+import io
+import math
+import time
+
+angka = 16
+akar = math.sqrt(angka)
+io.print "Akar dari 16 adalah: " + str(akar)
+
+time.sleep 1000
+io.print "Selesai jeda 1 detik"
 ```
+
+---
+
+#### B. Tutorial: Cara Membuat Library / Modul Sendiri
+Membuat library di EasLang sangat sederhana. Anda cukup membuat berkas `.eas` baru dan mendefinisikan fungsi, variabel, atau objek yang ingin digunakan kembali oleh program lain.
+
+##### Langkah 1: Buat Berkas Library (Contoh: `kalkulator.eas`)
+Simpan file ini dengan nama `kalkulator.eas`:
+```eas
+phi = 3.14159
+
+fn tambah a b
+    a + b
+
+fn kurang a b
+    a - b
+
+fn kali a b
+    a * b
+
+fn bagi a b
+    a / b
+
+fn luas_lingkaran r
+    phi * r * r
+```
+
+> 💡 **Tips Pengorganisasian dengan Objek (Namespacing):**
+> Anda juga dapat membungkus fungsi-fungsi library ke dalam suatu objek:
+> ```eas
+> helper = new
+> set helper "sapa" (fn nama
+>     "Halo " + nama)
+> ```
+
+---
+
+#### C. Tutorial: Cara Mengimpor & Menggunakan Library
+Gunakan perintah `import` atau `use` pada skrip utama Anda.
+
+##### Langkah 2: Buat Skrip Utama (Contoh: `main.eas`)
+Simpan di direktori yang sama dengan `kalkulator.eas`:
+```eas
+use io
+import "kalkulator"
+
+hasilTambah = tambah 15 25
+io.print "15 + 25 = " + str(hasilTambah)
+
+hasilKali = kali(6, 7)
+io.print "6 * 7 = " + str(hasilKali)
+
+r = 10
+luas = luas_lingkaran r
+io.print "Luas lingkaran (r=10): " + str(luas)
+```
+
+##### Berbagai Format Penulisan Impor yang Didukung:
+EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
+1. **Dengan Tanda Kutip**:
+   - `import "kalkulator"` atau `use "kalkulator"`
+   - `import "kalkulator.eas"` atau `use "kalkulator.eas"`
+2. **Tanpa Tanda Kutip (Gaya Python / Ruby)**:
+   - `import kalkulator` atau `use kalkulator`
+3. **Fleksibilitas Pemanggilan Fungsi**:
+   - Fungsi dari library yang diimpor dapat dipanggil dengan spasi tanpa tanda kurung (`tambah 10 20`) ataupun dengan tanda kurung (`tambah(10, 20)`).
 
 ---
 

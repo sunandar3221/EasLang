@@ -1,4 +1,7 @@
 #include "VM.hpp"
+#include "Lexer.hpp"
+#include "Parser.hpp"
+#include "BytecodeCompiler.hpp"
 #include <iostream>
 #include <stdexcept>
 #include <cmath>
@@ -65,6 +68,41 @@ void VM::loadLibrary(const std::string& name) {
         guiObj.setProperty("window", Value(ValueType::FUNCTION, "gui.window"));
         guiObj.setProperty("run", Value(ValueType::FUNCTION, "gui.run"));
         globals_["gui"] = guiObj;
+    } else {
+        std::string filename = name;
+        if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
+            filename += ".eas";
+        }
+        Value fileContent = StandardLibrary::readFile(filename);
+        if (!fileContent.strVal.empty()) {
+            Lexer modLexer(fileContent.strVal);
+            auto modTokens = modLexer.tokenize();
+            if (!modLexer.hasErrors()) {
+                Parser modParser(std::move(modTokens));
+                auto modAst = modParser.parseProgram();
+                if (!modParser.hasErrors()) {
+                    BytecodeCompiler modComp;
+                    auto modChunk = modComp.compile(modAst.get());
+                    for (const auto& kv : modComp.getFunctions()) {
+                        functions_[kv.first] = kv.second;
+                    }
+                    VM modVM;
+                    modVM.globals_ = globals_;
+                    modVM.functions_ = functions_;
+                    modVM.loadedLibraries_ = loadedLibraries_;
+                    modVM.run(modChunk.get());
+                    for (const auto& g : modVM.globals_) {
+                        globals_[g.first] = g.second;
+                    }
+                    for (const auto& f : modVM.functions_) {
+                        functions_[f.first] = f.second;
+                    }
+                    for (const auto& l : modVM.loadedLibraries_) {
+                        loadedLibraries_.insert(l);
+                    }
+                }
+            }
+        }
     }
 }
 
