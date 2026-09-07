@@ -56,6 +56,21 @@ Value StandardLibrary::silentPrint(const std::vector<Value>& args) {
     return Value(out + "\n");
 }
 
+Value StandardLibrary::input(const std::string& prompt) {
+    if (!prompt.empty()) {
+        std::cout << prompt;
+        std::cout.flush();
+    }
+    std::string line;
+    if (std::getline(std::cin, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        return Value(line);
+    }
+    return Value("");
+}
+
 Value StandardLibrary::readFile(const std::string& path) {
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open()) {

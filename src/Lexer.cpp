@@ -28,6 +28,7 @@ void Lexer::initKeywords() {
     keywords_["while"] = TokenType::WHILE;
     keywords_["fn"] = TokenType::FN;
     keywords_["use"] = TokenType::USE;
+    keywords_["import"] = TokenType::USE;
     keywords_["new"] = TokenType::NEW;
     keywords_["get"] = TokenType::GET;
     keywords_["set"] = TokenType::SET;

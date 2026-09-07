@@ -1,9 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "AST.hpp"
 #include "Environment.hpp"
 #include "StandardLibrary.hpp"
 #include <memory>
+#include <unordered_set>
 
 class Interpreter {
 public:
@@ -17,9 +18,13 @@ public:
 
     std::shared_ptr<Environment> getGlobalEnvironment() const;
 
+    void loadLibrary(const std::string& name);
+    bool isLibraryLoaded(const std::string& name) const;
+
 private:
     std::shared_ptr<Environment> globalEnv_;
     std::shared_ptr<Environment> currentEnv_;
+    std::unordered_set<std::string> loadedLibraries_;
 
     void registerBuiltins();
 };

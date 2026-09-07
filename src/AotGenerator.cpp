@@ -99,11 +99,24 @@ std::string AotGenerator::generateExpr(Expr* expr) {
 
     if (auto* call = dynamic_cast<CallExpr*>(expr)) {
         const std::string& callee = call->callee;
-        if (callee == "read" && !call->arguments.empty()) {
+        if (callee == "input" || callee == "io.input" || callee == "io.ask" || callee == "ask") {
+            std::string p = call->arguments.empty() ? "\"\"" : "(Value(" + generateExpr(call->arguments[0].get()) + ")).toString()";
+            return "StandardLibrary::input(" + p + ")";
+        }
+        if ((callee == "read" || callee == "io.read") && !call->arguments.empty()) {
             return "StandardLibrary::readFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
         }
-        if (callee == "write" && call->arguments.size() >= 2) {
+        if ((callee == "write" || callee == "io.write") && call->arguments.size() >= 2) {
             return "StandardLibrary::writeFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
+        }
+        if (callee == "io.print") {
+            std::string p = "StandardLibrary::print(std::vector<Value>{";
+            for (size_t i = 0; i < call->arguments.size(); ++i) {
+                if (i > 0) p += ", ";
+                p += "Value(" + generateExpr(call->arguments[i].get()) + ")";
+            }
+            p += "})";
+            return p;
         }
         if (callee == "app" && !call->arguments.empty()) {
             return "([&](){ StandardLibrary::setAppTitle((Value(" + generateExpr(call->arguments[0].get()) + ")).toString()); return Value(); })()";
@@ -370,6 +383,10 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
         ss << "}\n";
         return;
     }
+
+    if (auto* useStmt = dynamic_cast<UseStmt*>(stmt)) {
+        return;
+    }
 }
 
 std::string AotGenerator::generateCpp(BlockStmt* program) {
@@ -418,7 +435,7 @@ std::string AotGenerator::generateCpp(BlockStmt* program) {
 
 bool AotGenerator::buildBinary(const std::string& sourceFile, const std::string& outputFile) {
 #ifdef _WIN32
-    std::string cmd = "g++ -std=c++20 -O3 -march=native -flto " + sourceFile + " src/Value.cpp src/StandardLibrary.cpp -Iinclude -lwininet -lgdi32 -luser32 -o " + outputFile;
+    std::string cmd = "g++ -std=c++20 -O3 -march=native -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " src/Value.cpp src/StandardLibrary.cpp -Iinclude -lwininet -lgdi32 -luser32 -o " + outputFile;
 #else
     std::string cmd = "g++ -std=c++20 -O3 -march=native -flto " + sourceFile + " src/Value.cpp src/StandardLibrary.cpp -Iinclude -o " + outputFile;
 #endif

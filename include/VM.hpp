@@ -3,6 +3,7 @@
 #include "Bytecode.hpp"
 #include "StandardLibrary.hpp"
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,6 +22,8 @@ public:
     void registerFunctions(const std::unordered_map<std::string, std::shared_ptr<Chunk>>& fns);
     Value run(Chunk* chunk);
     void runtimeError(const std::string& message, Chunk* chunk, size_t ip, size_t frameCount);
+    void loadLibrary(const std::string& name);
+    bool isLibraryLoaded(const std::string& name) const;
 
 private:
     static constexpr size_t STACK_MAX = 262144;
@@ -30,4 +33,5 @@ private:
     std::vector<CallFrame> frames_;
     std::unordered_map<std::string, Value> globals_;
     std::unordered_map<std::string, std::shared_ptr<Chunk>> functions_;
+    std::unordered_set<std::string> loadedLibraries_;
 };

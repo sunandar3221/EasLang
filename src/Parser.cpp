@@ -9,6 +9,13 @@ Parser::Parser(std::vector<Token> tokens)
     functionArity_["run"] = 0;
     functionArity_["send"] = 2;
     functionArity_["new"] = 0;
+    functionArity_["input"] = 1;
+    functionArity_["ask"] = 1;
+    functionArity_["io.input"] = 1;
+    functionArity_["io.ask"] = 1;
+    functionArity_["io.read"] = 1;
+    functionArity_["io.write"] = 2;
+    functionArity_["io.print"] = 1;
 }
 
 bool Parser::isAtEnd() const {
@@ -481,7 +488,25 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> expr) {
             expr = std::make_unique<IndexExpr>(std::move(expr), std::move(index));
         } else if (match(TokenType::DOT)) {
             std::string prop = advance().lexeme;
-            expr = std::make_unique<GetExpr>(std::move(expr), std::make_unique<LiteralExpr>(Value(prop)));
+            if (match(TokenType::LPAREN)) {
+                std::vector<std::unique_ptr<Expr>> args;
+                if (!check(TokenType::RPAREN)) {
+                    do {
+                        skipNewlines();
+                        if (check(TokenType::RPAREN) || isAtEnd()) break;
+                        args.push_back(parseExpression());
+                        skipNewlines();
+                    } while (match(TokenType::COMMA));
+                }
+                match(TokenType::RPAREN);
+                if (auto* var = dynamic_cast<VarExpr*>(expr.get())) {
+                    expr = std::make_unique<CallExpr>(var->name + "." + prop, std::move(args));
+                } else {
+                    expr = std::make_unique<GetExpr>(std::move(expr), std::make_unique<LiteralExpr>(Value(prop)));
+                }
+            } else {
+                expr = std::make_unique<GetExpr>(std::move(expr), std::make_unique<LiteralExpr>(Value(prop)));
+            }
         } else {
             break;
         }
@@ -546,6 +571,49 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
         std::string id = idTok.lexeme;
         int line = idTok.line;
         int col = idTok.column;
+
+        if (match(TokenType::DOT)) {
+            if (!isAtEnd() && peek().type != TokenType::NEWLINE && peek().type != TokenType::DEDENT &&
+                peek().type != TokenType::END && peek().type != TokenType::END_OF_FILE &&
+                peek().type != TokenType::COMMA && peek().type != TokenType::RPAREN && peek().type != TokenType::RBRACKET) {
+                Token propTok = advance();
+                std::string fullName = id + "." + propTok.lexeme;
+                auto it = functionArity_.find(fullName);
+                int arity = (it != functionArity_.end()) ? it->second : -1;
+
+                if (match(TokenType::LPAREN)) {
+                    std::vector<std::unique_ptr<Expr>> args;
+                    if (!check(TokenType::RPAREN)) {
+                        do {
+                            skipNewlines();
+                            if (check(TokenType::RPAREN) || isAtEnd()) break;
+                            args.push_back(parseExpression());
+                            skipNewlines();
+                        } while (match(TokenType::COMMA));
+                    }
+                    match(TokenType::RPAREN);
+                    return std::make_unique<CallExpr>(fullName, std::move(args), line, col);
+                }
+
+                if (arity > 0) {
+                    if (check(TokenType::NEWLINE) || check(TokenType::COMMA) || check(TokenType::RPAREN) ||
+                        check(TokenType::RBRACKET) || check(TokenType::DEDENT) || check(TokenType::END) || isAtEnd()) {
+                        auto target = std::make_unique<VarExpr>(id, line, col);
+                        return std::make_unique<GetExpr>(std::move(target), std::make_unique<LiteralExpr>(Value(propTok.lexeme)));
+                    }
+                    std::vector<std::unique_ptr<Expr>> args;
+                    for (int i = 0; i < arity; ++i) {
+                        if (i > 0) match(TokenType::COMMA);
+                        args.push_back(parseUnary());
+                    }
+                    return std::make_unique<CallExpr>(fullName, std::move(args), line, col);
+                }
+
+                auto target = std::make_unique<VarExpr>(id, line, col);
+                return std::make_unique<GetExpr>(std::move(target), std::make_unique<LiteralExpr>(Value(propTok.lexeme)));
+            }
+        }
+
         auto it = functionArity_.find(id);
         if (it != functionArity_.end()) {
             int arity = it->second;
@@ -555,13 +623,18 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
             }
             std::vector<std::unique_ptr<Expr>> args;
             if (match(TokenType::LPAREN)) {
-                for (int i = 0; i < arity; ++i) {
-                    if (i > 0) match(TokenType::COMMA);
-                    args.push_back(parseExpression());
+                if (!check(TokenType::RPAREN)) {
+                    do {
+                        skipNewlines();
+                        if (check(TokenType::RPAREN) || isAtEnd()) break;
+                        args.push_back(parseExpression());
+                        skipNewlines();
+                    } while (match(TokenType::COMMA));
                 }
                 match(TokenType::RPAREN);
             } else {
                 for (int i = 0; i < arity; ++i) {
+                    if (i > 0) match(TokenType::COMMA);
                     args.push_back(parseUnary());
                 }
             }
@@ -572,7 +645,10 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
             std::vector<std::unique_ptr<Expr>> args;
             if (!check(TokenType::RPAREN)) {
                 do {
+                    skipNewlines();
+                    if (check(TokenType::RPAREN) || isAtEnd()) break;
                     args.push_back(parseExpression());
+                    skipNewlines();
                 } while (match(TokenType::COMMA));
             }
             match(TokenType::RPAREN);

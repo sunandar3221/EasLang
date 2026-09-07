@@ -279,6 +279,13 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         compileBlock(blockStmt);
         return;
     }
+
+    if (auto* useStmt = dynamic_cast<UseStmt*>(stmt)) {
+        size_t idx = currentChunk_->addConstant(Value(useStmt->moduleName));
+        currentChunk_->emitOp(OpCode::OP_USE, useStmt->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(idx), useStmt->line);
+        return;
+    }
 }
 
 void BytecodeCompiler::compileExpr(Expr* expr) {

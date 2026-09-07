@@ -20,6 +20,56 @@ void Interpreter::registerBuiltins() {
     globalEnv_->define("nil", Value());
 }
 
+bool Interpreter::isLibraryLoaded(const std::string& name) const {
+    return loadedLibraries_.find(name) != loadedLibraries_.end();
+}
+
+void Interpreter::loadLibrary(const std::string& name) {
+    loadedLibraries_.insert(name);
+    if (name == "io") {
+        Value ioObj = Value::makeObject();
+        ioObj.setProperty("input", Value(ValueType::FUNCTION, "io.input"));
+        ioObj.setProperty("ask", Value(ValueType::FUNCTION, "io.ask"));
+        ioObj.setProperty("read", Value(ValueType::FUNCTION, "io.read"));
+        ioObj.setProperty("write", Value(ValueType::FUNCTION, "io.write"));
+        ioObj.setProperty("print", Value(ValueType::FUNCTION, "print"));
+        globalEnv_->assign("io", ioObj);
+        globalEnv_->assign("input", Value(ValueType::FUNCTION, "input"));
+        globalEnv_->assign("ask", Value(ValueType::FUNCTION, "ask"));
+    } else if (name == "math") {
+        Value mathObj = Value::makeObject();
+        mathObj.setProperty("pi", Value(3.141592653589793));
+        mathObj.setProperty("e", Value(2.718281828459045));
+        mathObj.setProperty("sqrt", Value(ValueType::FUNCTION, "math.sqrt"));
+        mathObj.setProperty("sin", Value(ValueType::FUNCTION, "math.sin"));
+        mathObj.setProperty("cos", Value(ValueType::FUNCTION, "math.cos"));
+        mathObj.setProperty("tan", Value(ValueType::FUNCTION, "math.tan"));
+        mathObj.setProperty("abs", Value(ValueType::FUNCTION, "math.abs"));
+        mathObj.setProperty("floor", Value(ValueType::FUNCTION, "math.floor"));
+        mathObj.setProperty("ceil", Value(ValueType::FUNCTION, "math.ceil"));
+        mathObj.setProperty("round", Value(ValueType::FUNCTION, "math.round"));
+        mathObj.setProperty("pow", Value(ValueType::FUNCTION, "math.pow"));
+        mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
+        globalEnv_->assign("math", mathObj);
+    } else if (name == "time") {
+        Value timeObj = Value::makeObject();
+        timeObj.setProperty("now", Value(ValueType::FUNCTION, "time.now"));
+        timeObj.setProperty("sleep", Value(ValueType::FUNCTION, "time.sleep"));
+        globalEnv_->assign("time", timeObj);
+    } else if (name == "net" || name == "http") {
+        Value netObj = Value::makeObject();
+        netObj.setProperty("get", Value(ValueType::FUNCTION, "get"));
+        netObj.setProperty("send", Value(ValueType::FUNCTION, "send"));
+        globalEnv_->assign(name, netObj);
+    } else if (name == "gui") {
+        Value guiObj = Value::makeObject();
+        guiObj.setProperty("app", Value(ValueType::FUNCTION, "app"));
+        guiObj.setProperty("window", Value(ValueType::FUNCTION, "window"));
+        guiObj.setProperty("run", Value(ValueType::FUNCTION, "run"));
+        globalEnv_->assign("gui", guiObj);
+    }
+}
+
 std::shared_ptr<Environment> Interpreter::getGlobalEnvironment() const {
     return globalEnv_;
 }
@@ -115,6 +165,9 @@ Value Interpreter::execute(Stmt* stmt) {
     }
 
     if (auto* writeStmt = dynamic_cast<WriteStmt*>(stmt)) {
+        if (!isLibraryLoaded("io")) {
+            throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+        }
         Value pathVal = evaluate(writeStmt->path.get());
         Value contentVal = evaluate(writeStmt->content.get());
         return StandardLibrary::writeFile(pathVal.toString(), contentVal.toString());
@@ -150,7 +203,12 @@ Value Interpreter::execute(Stmt* stmt) {
     }
 
     if (auto* useStmt = dynamic_cast<UseStmt*>(stmt)) {
-        std::string filename = useStmt->moduleName;
+        std::string mod = useStmt->moduleName;
+        if (mod == "io" || mod == "math" || mod == "time" || mod == "net" || mod == "http" || mod == "gui") {
+            loadLibrary(mod);
+            return Value(true);
+        }
+        std::string filename = mod;
         if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
             filename += ".eas";
         }
@@ -180,6 +238,18 @@ Value Interpreter::evaluate(Expr* expr) {
     }
 
     if (auto* var = dynamic_cast<VarExpr*>(expr)) {
+        if ((var->name == "io" || var->name == "input" || var->name == "ask") && !isLibraryLoaded("io")) {
+            throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+        }
+        if ((var->name == "read" || var->name == "write") && !isLibraryLoaded("io")) {
+            throw std::runtime_error("Function '" + var->name + "' requires library 'io'. Please use 'use io' or 'import io' first.");
+        }
+        if (var->name == "math" && !isLibraryLoaded("math")) {
+            throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+        }
+        if (var->name == "time" && !isLibraryLoaded("time")) {
+            throw std::runtime_error("Library 'time' is not loaded. Please use 'use time' or 'import time' first.");
+        }
         Value val;
         if (currentEnv_->get(var->name, val)) {
             return val;
@@ -191,7 +261,7 @@ Value Interpreter::evaluate(Expr* expr) {
         if (var->name == "true") return Value(true);
         if (var->name == "false") return Value(false);
         if (var->name == "nil" || var->name == "null") return Value();
-        if (var->name == "print" || var->name == "silent_print" || var->name == "read" || var->name == "write" || var->name == "app" || var->name == "window" || var->name == "run" || var->name == "len" || var->name == "get" || var->name == "send") {
+        if (var->name == "print" || var->name == "silent_print" || var->name == "app" || var->name == "window" || var->name == "run" || var->name == "len" || var->name == "get" || var->name == "send") {
             return Value(ValueType::FUNCTION, var->name);
         }
         throw std::runtime_error("Undefined variable '" + var->name + "' at line " + std::to_string(var->line));
@@ -305,19 +375,42 @@ Value Interpreter::evaluate(Expr* expr) {
             return Value(evaluate(call->arguments[0].get()).asFloat());
         }
 
-        if (name == "print") {
+        if (name == "input" || name == "io.input" || name == "io.ask" || name == "ask") {
+            if (!isLibraryLoaded("io")) {
+                throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+            }
+            std::string prompt = "";
+            if (!call->arguments.empty()) {
+                prompt = evaluate(call->arguments[0].get()).toString();
+            }
+            return StandardLibrary::input(prompt);
+        }
+
+        if (name == "print" || name == "io.print") {
             std::vector<Value> args;
             for (const auto& a : call->arguments) args.push_back(evaluate(a.get()));
             StandardLibrary::print(args);
             return Value();
         }
 
-        if (name == "read" && !call->arguments.empty()) {
-            return StandardLibrary::readFile(evaluate(call->arguments[0].get()).toString());
+        if (name == "read" || name == "io.read") {
+            if (!isLibraryLoaded("io")) {
+                throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+            }
+            if (!call->arguments.empty()) {
+                return StandardLibrary::readFile(evaluate(call->arguments[0].get()).toString());
+            }
+            return Value();
         }
 
-        if (name == "write" && call->arguments.size() >= 2) {
-            return StandardLibrary::writeFile(evaluate(call->arguments[0].get()).toString(), evaluate(call->arguments[1].get()).toString());
+        if (name == "write" || name == "io.write") {
+            if (!isLibraryLoaded("io")) {
+                throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+            }
+            if (call->arguments.size() >= 2) {
+                return StandardLibrary::writeFile(evaluate(call->arguments[0].get()).toString(), evaluate(call->arguments[1].get()).toString());
+            }
+            return Value();
         }
 
         if (name == "get") {
@@ -368,6 +461,9 @@ Value Interpreter::evaluate(Expr* expr) {
     }
 
     if (auto* readExpr = dynamic_cast<ReadExpr*>(expr)) {
+        if (!isLibraryLoaded("io")) {
+            throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+        }
         Value p = evaluate(readExpr->path.get());
         return StandardLibrary::readFile(p.toString());
     }

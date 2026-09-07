@@ -45,7 +45,8 @@ enum class OpCode : uint8_t {
     OP_SET_PROP,
     OP_BUILD_LIST,
     OP_GET_INDEX,
-    OP_SET_INDEX
+    OP_SET_INDEX,
+    OP_USE
 };
 
 class Chunk {

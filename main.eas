@@ -1,6 +1,3 @@
-nama = "Yanto"
+jawaban = get "google.com"
 
-if nama == "Yanto"
-    print("Nama saya adalah Yanto")
-else
-    print("Nama saya bukan Yanto")
+print jawaban

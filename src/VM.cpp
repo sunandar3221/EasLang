@@ -1,6 +1,14 @@
 #include "VM.hpp"
 #include <iostream>
 #include <stdexcept>
+#include <cmath>
+#include <cstdlib>
+#include <chrono>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 VM::VM() {
     stack_.resize(STACK_MAX);
@@ -15,6 +23,53 @@ void VM::registerFunctions(const std::unordered_map<std::string, std::shared_ptr
     for (const auto& kv : fns) {
         functions_[kv.first] = kv.second;
     }
+}
+
+void VM::loadLibrary(const std::string& name) {
+    loadedLibraries_.insert(name);
+    if (name == "io") {
+        Value ioObj = Value::makeObject();
+        ioObj.setProperty("input", Value(ValueType::FUNCTION, "io.input"));
+        ioObj.setProperty("ask", Value(ValueType::FUNCTION, "io.input"));
+        ioObj.setProperty("read", Value(ValueType::FUNCTION, "io.read"));
+        ioObj.setProperty("write", Value(ValueType::FUNCTION, "io.write"));
+        ioObj.setProperty("print", Value(ValueType::FUNCTION, "io.print"));
+        globals_["io"] = ioObj;
+        globals_["input"] = Value(ValueType::FUNCTION, "io.input");
+    } else if (name == "math") {
+        Value mathObj = Value::makeObject();
+        mathObj.setProperty("sqrt", Value(ValueType::FUNCTION, "math.sqrt"));
+        mathObj.setProperty("abs", Value(ValueType::FUNCTION, "math.abs"));
+        mathObj.setProperty("pow", Value(ValueType::FUNCTION, "math.pow"));
+        mathObj.setProperty("floor", Value(ValueType::FUNCTION, "math.floor"));
+        mathObj.setProperty("ceil", Value(ValueType::FUNCTION, "math.ceil"));
+        mathObj.setProperty("round", Value(ValueType::FUNCTION, "math.round"));
+        mathObj.setProperty("min", Value(ValueType::FUNCTION, "math.min"));
+        mathObj.setProperty("max", Value(ValueType::FUNCTION, "math.max"));
+        mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
+        mathObj.setProperty("pi", Value(3.14159265358979323846));
+        globals_["math"] = mathObj;
+    } else if (name == "time") {
+        Value timeObj = Value::makeObject();
+        timeObj.setProperty("sleep", Value(ValueType::FUNCTION, "time.sleep"));
+        timeObj.setProperty("now", Value(ValueType::FUNCTION, "time.now"));
+        globals_["time"] = timeObj;
+    } else if (name == "net" || name == "http") {
+        Value netObj = Value::makeObject();
+        netObj.setProperty("get", Value(ValueType::FUNCTION, "net.get"));
+        netObj.setProperty("send", Value(ValueType::FUNCTION, "net.send"));
+        globals_[name] = netObj;
+    } else if (name == "gui") {
+        Value guiObj = Value::makeObject();
+        guiObj.setProperty("app", Value(ValueType::FUNCTION, "gui.app"));
+        guiObj.setProperty("window", Value(ValueType::FUNCTION, "gui.window"));
+        guiObj.setProperty("run", Value(ValueType::FUNCTION, "gui.run"));
+        globals_["gui"] = guiObj;
+    }
+}
+
+bool VM::isLibraryLoaded(const std::string& name) const {
+    return loadedLibraries_.find(name) != loadedLibraries_.end();
 }
 
 void VM::runtimeError(const std::string& message, Chunk* chunk, size_t ip, size_t frameCount) {
@@ -123,10 +178,22 @@ Value VM::run(Chunk* chunk) {
                         *top++ = Value(true);
                     } else if (name == "false") {
                         *top++ = Value(false);
-                    } else if (name == "nil" || name == "null") {
-                        *top++ = Value();
-                    } else if (name == "print" || name == "silent_print" || name == "read" || name == "write" || name == "app" || name == "window" || name == "run" || name == "len" || name == "get" || name == "send") {
+                    } else if (name == "print" || name == "silent_print" || name == "len") {
                         *top++ = Value(ValueType::FUNCTION, name);
+                    } else if (name == "io") {
+                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                    } else if (name == "input") {
+                        runtimeError("Function 'input' requires library 'io'. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                    } else if (name == "read" || name == "write") {
+                        runtimeError("Function '" + name + "' requires library 'io'. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                    } else if (name == "math") {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    } else if (name == "time") {
+                        runtimeError("Library 'time' is not loaded. Please use 'use time' or 'import time' first.", curChunk, ip, frameCount);
+                    } else if (name == "net" || name == "http") {
+                        runtimeError("Library '" + name + "' is not loaded. Please use 'use " + name + "' first.", curChunk, ip, frameCount);
+                    } else if (name == "gui") {
+                        runtimeError("Library 'gui' is not loaded. Please use 'use gui' first.", curChunk, ip, frameCount);
                     } else {
                         runtimeError("Undefined variable '" + name + "'", curChunk, ip, frameCount);
                     }
@@ -356,7 +423,7 @@ Value VM::run(Chunk* chunk) {
                     else if (arg.isString()) *top++ = Value(static_cast<int64_t>(arg.strVal.size()));
                     else if (arg.isObject()) *top++ = Value(static_cast<int64_t>(arg.objVal ? arg.objVal->size() : 0));
                     else *top++ = Value(static_cast<int64_t>(0));
-                } else if (name == "print") {
+                } else if (name == "print" || name == "io.print") {
                     std::vector<Value> args;
                     for (size_t i = 0; i < argCount; ++i) {
                         args.push_back(*(top - argCount + i));
@@ -370,14 +437,64 @@ Value VM::run(Chunk* chunk) {
                     }
                     top -= argCount;
                     *top++ = StandardLibrary::silentPrint(args);
-                } else if (name == "read") {
+                } else if (name == "input" || name == "io.input" || name == "io.ask" || name == "ask") {
+                    if (!isLibraryLoaded("io")) {
+                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                    }
+                    std::string prompt;
+                    if (argCount > 0) {
+                        prompt = (*(top - argCount)).toString();
+                        top -= argCount;
+                    }
+                    *top++ = StandardLibrary::input(prompt);
+                } else if (name == "read" || name == "io.read") {
+                    if (!isLibraryLoaded("io")) {
+                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                    }
                     Value path = *(--top);
                     *top++ = StandardLibrary::readFile(path.toString());
-                } else if (name == "write") {
+                } else if (name == "write" || name == "io.write") {
+                    if (!isLibraryLoaded("io")) {
+                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                    }
                     Value c = *(--top);
                     Value p = *(--top);
                     *top++ = StandardLibrary::writeFile(p.toString(), c.toString());
-                } else if (name == "get") {
+                } else if (name == "math.sqrt") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = Value(std::sqrt(val));
+                } else if (name == "math.abs") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = Value(std::abs(val));
+                } else if (name == "math.pow") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double exp = (*(--top)).asFloat();
+                    double base = (*(--top)).asFloat();
+                    *top++ = Value(std::pow(base, exp));
+                } else if (name == "time.sleep") {
+                    if (!isLibraryLoaded("time")) {
+                        runtimeError("Library 'time' is not loaded. Please use 'use time' or 'import time' first.", curChunk, ip, frameCount);
+                    }
+                    int64_t ms = argCount > 0 ? (*(--top)).asInt() : 0;
+#ifdef _WIN32
+                    Sleep(static_cast<DWORD>(ms));
+#else
+                    usleep(static_cast<useconds_t>(ms * 1000));
+#endif
+                    *top++ = Value();
+                } else if (name == "time.now") {
+                    auto now = std::chrono::system_clock::now().time_since_epoch();
+                    int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+                    *top++ = Value(ms);
+                } else if (name == "get" || name == "net.get" || name == "http.get") {
                     if (argCount == 1) {
                         Value u = *(--top);
                         *top++ = StandardLibrary::httpGet(u.toString());
@@ -386,20 +503,20 @@ Value VM::run(Chunk* chunk) {
                         Value tgt = *(--top);
                         *top++ = tgt.getProperty(prop.toString());
                     }
-                } else if (name == "send") {
+                } else if (name == "send" || name == "net.send" || name == "http.send") {
                     Value d = *(--top);
                     Value t = *(--top);
                     *top++ = StandardLibrary::httpSend(t.toString(), d.toString());
-                } else if (name == "app") {
+                } else if (name == "app" || name == "gui.app") {
                     Value t = *(--top);
                     StandardLibrary::setAppTitle(t.toString());
                     *top++ = Value();
-                } else if (name == "window") {
+                } else if (name == "window" || name == "gui.window") {
                     Value h = *(--top);
                     Value w = *(--top);
                     StandardLibrary::setWindowSize(static_cast<int>(w.asInt()), static_cast<int>(h.asInt()));
                     *top++ = Value();
-                } else if (name == "run") {
+                } else if (name == "run" || name == "gui.run") {
                     int timeout = argCount > 0 ? static_cast<int>((*(--top)).asInt()) : -1;
                     *top++ = StandardLibrary::runApp(timeout);
                 } else {
@@ -468,12 +585,18 @@ Value VM::run(Chunk* chunk) {
                 break;
             }
             case OpCode::OP_WRITE: {
+                if (!isLibraryLoaded("io")) {
+                    runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                }
                 Value content = *(--top);
                 Value path = *(--top);
                 *top++ = StandardLibrary::writeFile(path.toString(), content.toString());
                 break;
             }
             case OpCode::OP_READ: {
+                if (!isLibraryLoaded("io")) {
+                    runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                }
                 Value path = *(--top);
                 *top++ = StandardLibrary::readFile(path.toString());
                 break;
@@ -535,6 +658,13 @@ Value VM::run(Chunk* chunk) {
                 Value tgt = *(--top);
                 tgt.setIndex(idx, val);
                 *top++ = val;
+                break;
+            }
+            case OpCode::OP_USE: {
+                uint16_t idx = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                ip += 2;
+                const std::string& modName = curChunk->constants[idx].strVal;
+                loadLibrary(modName);
                 break;
             }
         }
