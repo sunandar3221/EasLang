@@ -1,0 +1,6 @@
+nama = "Yanto"
+
+if nama == "Yanto"
+    print("Nama saya adalah Yanto")
+else
+    print("Nama saya bukan Yanto")

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Token.hpp"
 #include <vector>
@@ -9,6 +9,8 @@ class Lexer {
 public:
     explicit Lexer(std::string source);
     std::vector<Token> tokenize();
+    bool hasErrors() const { return !errors_.empty(); }
+    const std::vector<std::string>& getErrors() const { return errors_; }
 
 private:
     std::string source_;
@@ -19,6 +21,7 @@ private:
     int bracketNesting_;
     bool atLineStart_;
     std::unordered_map<std::string, TokenType> keywords_;
+    std::vector<std::string> errors_;
 
     void initKeywords();
     bool isAtEnd() const;

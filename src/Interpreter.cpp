@@ -184,7 +184,17 @@ Value Interpreter::evaluate(Expr* expr) {
         if (currentEnv_->get(var->name, val)) {
             return val;
         }
-        return Value();
+        FunctionDef fnDef;
+        if (currentEnv_->getFunction(var->name, fnDef)) {
+            return Value(ValueType::FUNCTION, var->name);
+        }
+        if (var->name == "true") return Value(true);
+        if (var->name == "false") return Value(false);
+        if (var->name == "nil" || var->name == "null") return Value();
+        if (var->name == "print" || var->name == "silent_print" || var->name == "read" || var->name == "write" || var->name == "app" || var->name == "window" || var->name == "run" || var->name == "len" || var->name == "get" || var->name == "send") {
+            return Value(ValueType::FUNCTION, var->name);
+        }
+        throw std::runtime_error("Undefined variable '" + var->name + "' at line " + std::to_string(var->line));
     }
 
     if (auto* listLit = dynamic_cast<ListLiteralExpr*>(expr)) {
@@ -209,8 +219,18 @@ Value Interpreter::evaluate(Expr* expr) {
             case TokenType::PLUS: return left + right;
             case TokenType::MINUS: return left - right;
             case TokenType::STAR: return left * right;
-            case TokenType::SLASH: return left / right;
-            case TokenType::PERCENT: return left % right;
+            case TokenType::SLASH: {
+                if (right.asFloat() == 0.0) {
+                    throw std::runtime_error("Division by zero at line " + std::to_string(bin->line));
+                }
+                return left / right;
+            }
+            case TokenType::PERCENT: {
+                if (right.asInt() == 0) {
+                    throw std::runtime_error("Modulo by zero at line " + std::to_string(bin->line));
+                }
+                return left % right;
+            }
             case TokenType::EQUAL_EQUAL: return Value(left == right);
             case TokenType::BANG_EQUAL: return Value(left != right);
             case TokenType::LESS: return Value(left < right);
@@ -331,7 +351,12 @@ Value Interpreter::evaluate(Expr* expr) {
         }
 
         FunctionDef fnDef;
-        if (currentEnv_->getFunction(name, fnDef)) {
+        std::string targetName = name;
+        Value varVal;
+        if (currentEnv_->get(name, varVal) && varVal.isFunction()) {
+            targetName = varVal.strVal;
+        }
+        if (currentEnv_->getFunction(targetName, fnDef)) {
             auto callEnv = std::make_shared<Environment>(fnDef.closure);
             for (size_t i = 0; i < fnDef.params.size() && i < call->arguments.size(); ++i) {
                 callEnv->define(fnDef.params[i], evaluate(call->arguments[i].get()));
@@ -339,7 +364,7 @@ Value Interpreter::evaluate(Expr* expr) {
             return executeBlock(fnDef.body.get(), callEnv);
         }
 
-        return Value();
+        throw std::runtime_error("Undefined function '" + name + "' at line " + std::to_string(call->line));
     }
 
     if (auto* readExpr = dynamic_cast<ReadExpr*>(expr)) {

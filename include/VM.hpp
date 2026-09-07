@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Bytecode.hpp"
 #include "StandardLibrary.hpp"
@@ -20,6 +20,7 @@ public:
     void registerFunction(const std::string& name, std::shared_ptr<Chunk> chunk);
     void registerFunctions(const std::unordered_map<std::string, std::shared_ptr<Chunk>>& fns);
     Value run(Chunk* chunk);
+    void runtimeError(const std::string& message, Chunk* chunk, size_t ip, size_t frameCount);
 
 private:
     static constexpr size_t STACK_MAX = 262144;

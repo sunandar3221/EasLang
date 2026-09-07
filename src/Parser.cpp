@@ -54,6 +54,17 @@ void Parser::skipNewlines() {
     }
 }
 
+void Parser::reportError(const std::string& message, const Token& token) {
+    std::string loc = "[Line " + std::to_string(token.line) + ", Col " + std::to_string(token.column) + "]";
+    if (token.type == TokenType::END_OF_FILE) {
+        errors_.push_back("Syntax Error " + loc + ": " + message + " at end of file.");
+    } else if (token.lexeme.empty()) {
+        errors_.push_back("Syntax Error " + loc + ": " + message + ".");
+    } else {
+        errors_.push_back("Syntax Error " + loc + ": " + message + " near '" + token.lexeme + "'.");
+    }
+}
+
 std::unique_ptr<BlockStmt> Parser::parseProgram() {
     auto block = std::make_unique<BlockStmt>();
     while (!isAtEnd()) {
@@ -121,6 +132,15 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         case TokenType::LOOP: return parseLoop();
         case TokenType::WHILE: return parseWhile();
         case TokenType::FN: return parseFnDecl();
+        case TokenType::ELSE: {
+            reportError("Unexpected 'else' without matching 'if'", peek());
+            advance();
+            return nullptr;
+        }
+        case TokenType::DEDENT: {
+            advance();
+            return nullptr;
+        }
         default: return parseAssignmentOrExpr();
     }
 }
@@ -129,14 +149,31 @@ std::unique_ptr<Stmt> Parser::parsePrint(bool silent) {
     int line = advance().line;
     std::vector<std::unique_ptr<Expr>> args;
 
-    while (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) && !isAtEnd()) {
-        match(TokenType::COMMA);
-        if (check(TokenType::NEWLINE) || check(TokenType::DEDENT) || check(TokenType::END) || isAtEnd()) break;
-        auto expr = parseExpression();
-        if (expr) {
-            args.push_back(std::move(expr));
+    if (match(TokenType::LPAREN)) {
+        if (!check(TokenType::RPAREN)) {
+            do {
+                skipNewlines();
+                if (check(TokenType::RPAREN) || isAtEnd()) break;
+                auto expr = parseExpression();
+                if (expr) {
+                    args.push_back(std::move(expr));
+                }
+                skipNewlines();
+            } while (match(TokenType::COMMA));
         }
-        match(TokenType::COMMA);
+        if (!match(TokenType::RPAREN)) {
+            reportError("Expected closing ')' after print arguments", peek());
+        }
+    } else {
+        while (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) && !isAtEnd()) {
+            match(TokenType::COMMA);
+            if (check(TokenType::NEWLINE) || check(TokenType::DEDENT) || check(TokenType::END) || isAtEnd()) break;
+            auto expr = parseExpression();
+            if (expr) {
+                args.push_back(std::move(expr));
+            }
+            match(TokenType::COMMA);
+        }
     }
     match(TokenType::NEWLINE);
     return std::make_unique<PrintStmt>(std::move(args), line, 0, silent);
@@ -144,23 +181,53 @@ std::unique_ptr<Stmt> Parser::parsePrint(bool silent) {
 
 std::unique_ptr<Stmt> Parser::parseWrite() {
     int line = advance().line;
-    auto path = parseUnary();
-    auto content = parseExpression();
+    std::unique_ptr<Expr> path;
+    std::unique_ptr<Expr> content;
+    if (match(TokenType::LPAREN)) {
+        path = parseExpression();
+        match(TokenType::COMMA);
+        content = parseExpression();
+        if (!match(TokenType::RPAREN)) {
+            reportError("Expected closing ')' in write", peek());
+        }
+    } else {
+        path = parseUnary();
+        content = parseExpression();
+    }
     match(TokenType::NEWLINE);
     return std::make_unique<WriteStmt>(std::move(path), std::move(content), line);
 }
 
 std::unique_ptr<Stmt> Parser::parseApp() {
     int line = advance().line;
-    auto title = parseExpression();
+    std::unique_ptr<Expr> title;
+    if (match(TokenType::LPAREN)) {
+        title = parseExpression();
+        if (!match(TokenType::RPAREN)) {
+            reportError("Expected closing ')' in app", peek());
+        }
+    } else {
+        title = parseExpression();
+    }
     match(TokenType::NEWLINE);
     return std::make_unique<AppStmt>(std::move(title), line);
 }
 
 std::unique_ptr<Stmt> Parser::parseWindow() {
     int line = advance().line;
-    auto width = parseUnary();
-    auto height = parseUnary();
+    std::unique_ptr<Expr> width;
+    std::unique_ptr<Expr> height;
+    if (match(TokenType::LPAREN)) {
+        width = parseExpression();
+        match(TokenType::COMMA);
+        height = parseExpression();
+        if (!match(TokenType::RPAREN)) {
+            reportError("Expected closing ')' in window", peek());
+        }
+    } else {
+        width = parseUnary();
+        height = parseUnary();
+    }
     match(TokenType::NEWLINE);
     return std::make_unique<WindowStmt>(std::move(width), std::move(height), line);
 }
@@ -168,7 +235,14 @@ std::unique_ptr<Stmt> Parser::parseWindow() {
 std::unique_ptr<Stmt> Parser::parseRun() {
     int line = advance().line;
     std::unique_ptr<Expr> duration = nullptr;
-    if (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) && !isAtEnd()) {
+    if (match(TokenType::LPAREN)) {
+        if (!check(TokenType::RPAREN)) {
+            duration = parseExpression();
+        }
+        if (!match(TokenType::RPAREN)) {
+            reportError("Expected closing ')' in run", peek());
+        }
+    } else if (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) && !isAtEnd()) {
         duration = parseExpression();
     }
     match(TokenType::NEWLINE);
@@ -197,13 +271,23 @@ std::unique_ptr<Stmt> Parser::parseUse() {
 std::unique_ptr<Stmt> Parser::parseIf() {
     int line = advance().line;
     auto condition = parseExpression();
-    match(TokenType::NEWLINE);
+    if (!condition) {
+        reportError("Expected condition expression after 'if'", peek());
+    }
+    if (check(TokenType::NEWLINE)) advance();
     auto thenBranch = parseBlock();
     skipNewlines();
     std::unique_ptr<BlockStmt> elseBranch = nullptr;
     if (match(TokenType::ELSE)) {
-        match(TokenType::NEWLINE);
-        elseBranch = parseBlock();
+        if (check(TokenType::IF)) {
+            auto ifStmt = parseIf();
+            auto blk = std::make_unique<BlockStmt>();
+            blk->statements.push_back(std::move(ifStmt));
+            elseBranch = std::move(blk);
+        } else {
+            if (check(TokenType::NEWLINE)) advance();
+            elseBranch = parseBlock();
+        }
     }
     return std::make_unique<IfStmt>(std::move(condition), std::move(thenBranch), std::move(elseBranch), line);
 }
@@ -304,6 +388,12 @@ std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {
     }
 
     auto expr = parseExpression();
+    if (auto* var = dynamic_cast<VarExpr*>(expr.get())) {
+        auto it = functionArity_.find(var->name);
+        if (it != functionArity_.end() && it->second == 0) {
+            expr = std::make_unique<CallExpr>(var->name, std::vector<std::unique_ptr<Expr>>{}, var->line, var->column);
+        }
+    }
     match(TokenType::NEWLINE);
     return std::make_unique<ExprStmt>(std::move(expr), line);
 }
@@ -315,9 +405,9 @@ std::unique_ptr<Expr> Parser::parseExpression() {
 std::unique_ptr<Expr> Parser::parseLogicalOr() {
     auto expr = parseLogicalAnd();
     while (match(TokenType::OR)) {
-        TokenType op = previous().type;
+        Token opTok = previous();
         auto right = parseLogicalAnd();
-        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+        expr = std::make_unique<BinaryExpr>(std::move(expr), opTok.type, std::move(right), opTok.line, opTok.column);
     }
     return expr;
 }
@@ -325,9 +415,9 @@ std::unique_ptr<Expr> Parser::parseLogicalOr() {
 std::unique_ptr<Expr> Parser::parseLogicalAnd() {
     auto expr = parseEquality();
     while (match(TokenType::AND)) {
-        TokenType op = previous().type;
+        Token opTok = previous();
         auto right = parseEquality();
-        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+        expr = std::make_unique<BinaryExpr>(std::move(expr), opTok.type, std::move(right), opTok.line, opTok.column);
     }
     return expr;
 }
@@ -335,9 +425,9 @@ std::unique_ptr<Expr> Parser::parseLogicalAnd() {
 std::unique_ptr<Expr> Parser::parseEquality() {
     auto expr = parseRelational();
     while (match(TokenType::EQUAL_EQUAL) || match(TokenType::BANG_EQUAL)) {
-        TokenType op = previous().type;
+        Token opTok = previous();
         auto right = parseRelational();
-        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+        expr = std::make_unique<BinaryExpr>(std::move(expr), opTok.type, std::move(right), opTok.line, opTok.column);
     }
     return expr;
 }
@@ -346,9 +436,9 @@ std::unique_ptr<Expr> Parser::parseRelational() {
     auto expr = parseAdditive();
     while (match(TokenType::LESS) || match(TokenType::GREATER) ||
            match(TokenType::LESS_EQUAL) || match(TokenType::GREATER_EQUAL)) {
-        TokenType op = previous().type;
+        Token opTok = previous();
         auto right = parseAdditive();
-        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+        expr = std::make_unique<BinaryExpr>(std::move(expr), opTok.type, std::move(right), opTok.line, opTok.column);
     }
     return expr;
 }
@@ -356,9 +446,9 @@ std::unique_ptr<Expr> Parser::parseRelational() {
 std::unique_ptr<Expr> Parser::parseAdditive() {
     auto expr = parseMultiplicative();
     while (match(TokenType::PLUS) || match(TokenType::MINUS)) {
-        TokenType op = previous().type;
+        Token opTok = previous();
         auto right = parseMultiplicative();
-        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+        expr = std::make_unique<BinaryExpr>(std::move(expr), opTok.type, std::move(right), opTok.line, opTok.column);
     }
     return expr;
 }
@@ -366,18 +456,18 @@ std::unique_ptr<Expr> Parser::parseAdditive() {
 std::unique_ptr<Expr> Parser::parseMultiplicative() {
     auto expr = parseUnary();
     while (match(TokenType::STAR) || match(TokenType::SLASH) || match(TokenType::PERCENT)) {
-        TokenType op = previous().type;
+        Token opTok = previous();
         auto right = parseUnary();
-        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+        expr = std::make_unique<BinaryExpr>(std::move(expr), opTok.type, std::move(right), opTok.line, opTok.column);
     }
     return expr;
 }
 
 std::unique_ptr<Expr> Parser::parseUnary() {
     if (match(TokenType::MINUS) || match(TokenType::NOT)) {
-        TokenType op = previous().type;
+        Token opTok = previous();
         auto right = parseUnary();
-        return std::make_unique<UnaryExpr>(op, std::move(right));
+        return std::make_unique<UnaryExpr>(opTok.type, std::move(right), opTok.line, opTok.column);
     }
     auto primary = parseCallOrPrimary();
     return parsePostfix(std::move(primary));
@@ -452,14 +542,16 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
     }
 
     if (check(TokenType::IDENTIFIER)) {
-        std::string id = peek().lexeme;
+        Token idTok = advance();
+        std::string id = idTok.lexeme;
+        int line = idTok.line;
+        int col = idTok.column;
         auto it = functionArity_.find(id);
         if (it != functionArity_.end()) {
-            advance();
             int arity = it->second;
             if (check(TokenType::NEWLINE) || check(TokenType::COMMA) || check(TokenType::RPAREN) ||
                 check(TokenType::RBRACKET) || check(TokenType::DEDENT) || check(TokenType::END) || isAtEnd()) {
-                return std::make_unique<VarExpr>(id);
+                return std::make_unique<VarExpr>(id, line, col);
             }
             std::vector<std::unique_ptr<Expr>> args;
             if (match(TokenType::LPAREN)) {
@@ -473,10 +565,9 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
                     args.push_back(parseUnary());
                 }
             }
-            return std::make_unique<CallExpr>(id, std::move(args));
+            return std::make_unique<CallExpr>(id, std::move(args), line, col);
         }
 
-        advance();
         if (match(TokenType::LPAREN)) {
             std::vector<std::unique_ptr<Expr>> args;
             if (!check(TokenType::RPAREN)) {
@@ -485,9 +576,9 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
                 } while (match(TokenType::COMMA));
             }
             match(TokenType::RPAREN);
-            return std::make_unique<CallExpr>(id, std::move(args));
+            return std::make_unique<CallExpr>(id, std::move(args), line, col);
         }
-        return std::make_unique<VarExpr>(id);
+        return std::make_unique<VarExpr>(id, line, col);
     }
 
     return parsePrimary();
@@ -526,19 +617,23 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
         if (!check(TokenType::RBRACKET)) {
             do {
                 skipNewlines();
-                if (check(TokenType::RBRACKET)) break;
+                if (check(TokenType::RBRACKET) || isAtEnd()) break;
                 elems.push_back(parseExpression());
                 skipNewlines();
             } while (match(TokenType::COMMA));
         }
         skipNewlines();
-        match(TokenType::RBRACKET);
+        if (!match(TokenType::RBRACKET)) {
+            reportError("Expected closing ']'", peek());
+        }
         return std::make_unique<ListLiteralExpr>(std::move(elems), line);
     }
 
     if (match(TokenType::LPAREN)) {
         auto expr = parseExpression();
-        match(TokenType::RPAREN);
+        if (!match(TokenType::RPAREN)) {
+            reportError("Expected closing ')'", peek());
+        }
         return expr;
     }
 
@@ -546,6 +641,32 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
         return std::make_unique<VarExpr>(previous().lexeme, line);
     }
 
-    advance();
+    if (check(TokenType::PRINT) || check(TokenType::SILENT_PRINT)) {
+        bool silent = (advance().type == TokenType::SILENT_PRINT);
+        std::vector<std::unique_ptr<Expr>> args;
+        if (match(TokenType::LPAREN)) {
+            if (!check(TokenType::RPAREN)) {
+                do {
+                    skipNewlines();
+                    if (check(TokenType::RPAREN) || isAtEnd()) break;
+                    args.push_back(parseExpression());
+                    skipNewlines();
+                } while (match(TokenType::COMMA));
+            }
+            if (!match(TokenType::RPAREN)) {
+                reportError("Expected closing ')'", peek());
+            }
+        }
+        return std::make_unique<CallExpr>(silent ? "silent_print" : "print", std::move(args));
+    }
+
+    if (isAtEnd()) {
+        reportError("Unexpected end of file in expression", peek());
+    } else if (check(TokenType::NEWLINE) || check(TokenType::DEDENT) || check(TokenType::END)) {
+        reportError("Expected expression", peek());
+    } else {
+        reportError("Unexpected token in expression", peek());
+        advance();
+    }
     return std::make_unique<LiteralExpr>(Value(), line);
 }

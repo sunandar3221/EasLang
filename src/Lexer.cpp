@@ -9,6 +9,12 @@ Lexer::Lexer(std::string source)
       column_(1),
       bracketNesting_(0),
       atLineStart_(true) {
+    if (source_.size() >= 3 &&
+        static_cast<unsigned char>(source_[0]) == 0xEF &&
+        static_cast<unsigned char>(source_[1]) == 0xBB &&
+        static_cast<unsigned char>(source_[2]) == 0xBF) {
+        cursor_ = 3;
+    }
     indentStack_.push_back(0);
     initKeywords();
 }
@@ -143,6 +149,8 @@ Token Lexer::readString() {
 
     if (!isAtEnd() && peek() == '"') {
         advance();
+    } else {
+        errors_.push_back("Syntax Error [Line " + std::to_string(startLine) + ", Col " + std::to_string(startCol) + "]: Unterminated string literal.");
     }
 
     Token tok(TokenType::STRING, val, startLine, startCol);
@@ -287,7 +295,13 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             case ',': tokens.emplace_back(TokenType::COMMA, ",", curLine, curCol); break;
             case '.': tokens.emplace_back(TokenType::DOT, ".", curLine, curCol); break;
+            case ':': break;
+            case '{': break;
+            case '}': break;
             default:
+                if (static_cast<unsigned char>(c) >= 32) {
+                    errors_.push_back("Syntax Error [Line " + std::to_string(curLine) + ", Col " + std::to_string(curCol) + "]: Unexpected character '" + std::string(1, c) + "'.");
+                }
                 break;
         }
     }

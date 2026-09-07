@@ -50,8 +50,21 @@ int main(int argc, char* argv[]) {
 
         Lexer lexer(content.strVal);
         auto tokens = lexer.tokenize();
+        if (lexer.hasErrors()) {
+            for (const auto& err : lexer.getErrors()) {
+                std::cerr << err << "\n";
+            }
+            return 1;
+        }
+
         Parser parser(std::move(tokens));
         auto program = parser.parseProgram();
+        if (parser.hasErrors()) {
+            for (const auto& err : parser.getErrors()) {
+                std::cerr << err << "\n";
+            }
+            return 1;
+        }
 
         AotGenerator aot;
         std::string cppCode = aot.generateCpp(program.get());
@@ -97,8 +110,21 @@ int main(int argc, char* argv[]) {
     try {
         Lexer lexer(content.strVal);
         auto tokens = lexer.tokenize();
+        if (lexer.hasErrors()) {
+            for (const auto& err : lexer.getErrors()) {
+                std::cerr << err << "\n";
+            }
+            return 1;
+        }
+
         Parser parser(std::move(tokens));
         auto program = parser.parseProgram();
+        if (parser.hasErrors()) {
+            for (const auto& err : parser.getErrors()) {
+                std::cerr << err << "\n";
+            }
+            return 1;
+        }
 
         BytecodeCompiler compiler;
         auto mainChunk = compiler.compile(program.get());
@@ -107,7 +133,12 @@ int main(int argc, char* argv[]) {
         vm.registerFunctions(compiler.getFunctions());
         vm.run(mainChunk.get());
     } catch (const std::exception& ex) {
-        std::cerr << "Runtime Error: " << ex.what() << "\n";
+        std::string msg = ex.what();
+        if (msg.rfind("Runtime Error", 0) != 0 && msg.rfind("Syntax Error", 0) != 0) {
+            std::cerr << "Runtime Error: " << msg << "\n";
+        } else {
+            std::cerr << msg << "\n";
+        }
         return 1;
     }
 

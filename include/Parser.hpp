@@ -12,6 +12,8 @@ public:
     explicit Parser(std::vector<Token> tokens);
     std::unique_ptr<BlockStmt> parseProgram();
     std::unique_ptr<Stmt> parseStatement();
+    bool hasErrors() const { return !errors_.empty(); }
+    const std::vector<std::string>& getErrors() const { return errors_; }
 
 private:
     std::vector<Token> tokens_;
@@ -19,6 +21,8 @@ private:
     std::unordered_map<std::string, int> functionArity_;
     int anonFnCounter_;
     std::vector<std::unique_ptr<FnDeclStmt>> hoistedAnonFns_;
+    std::vector<std::string> errors_;
+    void reportError(const std::string& message, const Token& token);
 
     bool isAtEnd() const;
     const Token& peek() const;

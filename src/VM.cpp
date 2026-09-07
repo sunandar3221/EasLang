@@ -1,5 +1,6 @@
 #include "VM.hpp"
 #include <iostream>
+#include <stdexcept>
 
 VM::VM() {
     stack_.resize(STACK_MAX);
@@ -14,6 +15,24 @@ void VM::registerFunctions(const std::unordered_map<std::string, std::shared_ptr
     for (const auto& kv : fns) {
         functions_[kv.first] = kv.second;
     }
+}
+
+void VM::runtimeError(const std::string& message, Chunk* chunk, size_t ip, size_t frameCount) {
+    std::string err = message;
+    if (chunk && !chunk->lines.empty()) {
+        size_t lineIdx = (ip > 0 && ip - 1 < chunk->lines.size()) ? ip - 1 : 0;
+        int line = chunk->lines[lineIdx];
+        err += "\n  [Line " + std::to_string(line) + "] in " + (chunk->name.empty() ? "script" : chunk->name);
+    }
+    for (size_t i = frameCount > 1 ? frameCount - 1 : 0; i > 0; --i) {
+        CallFrame& f = frames_[i - 1];
+        if (f.chunk && !f.chunk->lines.empty()) {
+            size_t fLineIdx = (f.ip > 0 && f.ip - 1 < f.chunk->lines.size()) ? f.ip - 1 : 0;
+            int fLine = f.chunk->lines[fLineIdx];
+            err += "\n  [Line " + std::to_string(fLine) + "] in " + (f.chunk->name.empty() ? "script" : f.chunk->name);
+        }
+    }
+    throw std::runtime_error(err);
 }
 
 Value VM::run(Chunk* chunk) {
@@ -100,8 +119,16 @@ Value VM::run(Chunk* chunk) {
                     auto fit = functions_.find(name);
                     if (fit != functions_.end()) {
                         *top++ = Value(ValueType::FUNCTION, name);
-                    } else {
+                    } else if (name == "true") {
+                        *top++ = Value(true);
+                    } else if (name == "false") {
+                        *top++ = Value(false);
+                    } else if (name == "nil" || name == "null") {
                         *top++ = Value();
+                    } else if (name == "print" || name == "silent_print" || name == "read" || name == "write" || name == "app" || name == "window" || name == "run" || name == "len" || name == "get" || name == "send") {
+                        *top++ = Value(ValueType::FUNCTION, name);
+                    } else {
+                        runtimeError("Undefined variable '" + name + "'", curChunk, ip, frameCount);
                     }
                 }
                 break;
@@ -148,7 +175,10 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_DIV: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
-                if (a.type == ValueType::INT && b.type == ValueType::INT && b.intVal != 0 && (a.intVal % b.intVal == 0)) {
+                if (b.asFloat() == 0.0) {
+                    runtimeError("Division by zero", curChunk, ip, frameCount);
+                }
+                if (a.type == ValueType::INT && b.type == ValueType::INT && (a.intVal % b.intVal == 0)) {
                     a.intVal /= b.intVal;
                 } else {
                     a = a / b;
@@ -159,7 +189,10 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_MOD: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
-                if (a.type == ValueType::INT && b.type == ValueType::INT && b.intVal != 0) {
+                if (b.asInt() == 0) {
+                    runtimeError("Modulo by zero", curChunk, ip, frameCount);
+                }
+                if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.intVal %= b.intVal;
                 } else {
                     a = a % b;
@@ -394,8 +427,7 @@ Value VM::run(Chunk* chunk) {
                         ip = 0;
                         slots = nextSlots;
                     } else {
-                        top -= argCount;
-                        *top++ = Value();
+                        runtimeError("Undefined function '" + name + "'", curChunk, ip, frameCount);
                     }
                 }
                 break;
