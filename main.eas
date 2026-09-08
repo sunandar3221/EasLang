@@ -1,3 +1,8 @@
-jawaban = get "google.com"
+use io
 
-print jawaban
+nama = io.input("Nama kamu siapa? ")
+
+if nama == "Agus"
+    print "Halo Gusion!"
+else
+    io.print  "Halo " + nama

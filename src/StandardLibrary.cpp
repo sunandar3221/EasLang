@@ -63,7 +63,7 @@ Value StandardLibrary::input(const std::string& prompt) {
     }
     std::string line;
     if (std::getline(std::cin, line)) {
-        if (!line.empty() && line.back() == '\r') {
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) {
             line.pop_back();
         }
         return Value(line);

@@ -1,5 +1,11 @@
 use io
-halo = loop 3000
-    silent_print "kamu manusia apa apa"
 
-write "hai.txt" halo
+nama = io.input("Siapa nama kamu? ")
+umur = input "Berapa umur kamu? "
+hobi = io.ask("Apa hobi kamu? ")
+
+io.print "Halo " + nama + ", umur " + umur + ", hobi " + hobi
+
+io.write "catatan.txt", "Belajar EasLang sangat menyenangkan"
+isi = io.read "catatan.txt"
+print isi

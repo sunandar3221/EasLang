@@ -219,6 +219,7 @@ std::unique_ptr<Stmt> Parser::parseWrite() {
         }
     } else {
         path = parseUnary();
+        match(TokenType::COMMA);
         content = parseExpression();
     }
     match(TokenType::NEWLINE);
@@ -253,6 +254,7 @@ std::unique_ptr<Stmt> Parser::parseWindow() {
         }
     } else {
         width = parseUnary();
+        match(TokenType::COMMA);
         height = parseUnary();
     }
     match(TokenType::NEWLINE);
@@ -279,7 +281,9 @@ std::unique_ptr<Stmt> Parser::parseRun() {
 std::unique_ptr<Stmt> Parser::parseSet() {
     int line = advance().line;
     auto target = parseUnary();
+    match(TokenType::COMMA);
     auto prop = parseUnary();
+    match(TokenType::COMMA);
     auto val = parseExpression();
     match(TokenType::NEWLINE);
     return std::make_unique<SetStmt>(std::move(target), std::move(prop), std::move(val), line);
@@ -623,6 +627,35 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
                 auto it = functionArity_.find(fullName);
                 int arity = (it != functionArity_.end()) ? it->second : -1;
 
+                if (fullName == "io.print") {
+                    if (match(TokenType::LPAREN)) {
+                        std::vector<std::unique_ptr<Expr>> args;
+                        if (!check(TokenType::RPAREN)) {
+                            do {
+                                skipNewlines();
+                                if (check(TokenType::RPAREN) || isAtEnd()) break;
+                                args.push_back(parseExpression());
+                                skipNewlines();
+                            } while (match(TokenType::COMMA));
+                        }
+                        match(TokenType::RPAREN);
+                        return std::make_unique<CallExpr>(fullName, std::move(args), line, col);
+                    }
+                    std::vector<std::unique_ptr<Expr>> args;
+                    while (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) &&
+                           !check(TokenType::RPAREN) && !check(TokenType::RBRACKET) && !isAtEnd()) {
+                        match(TokenType::COMMA);
+                        if (check(TokenType::NEWLINE) || check(TokenType::DEDENT) || check(TokenType::END) ||
+                            check(TokenType::RPAREN) || check(TokenType::RBRACKET) || isAtEnd()) break;
+                        auto expr = parseExpression();
+                        if (expr) {
+                            args.push_back(std::move(expr));
+                        }
+                        match(TokenType::COMMA);
+                    }
+                    return std::make_unique<CallExpr>(fullName, std::move(args), line, col);
+                }
+
                 if (match(TokenType::LPAREN)) {
                     std::vector<std::unique_ptr<Expr>> args;
                     if (!check(TokenType::RPAREN)) {
@@ -646,7 +679,7 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
                     std::vector<std::unique_ptr<Expr>> args;
                     for (int i = 0; i < arity; ++i) {
                         if (i > 0) match(TokenType::COMMA);
-                        args.push_back(parseUnary());
+                        args.push_back(parseExpression());
                     }
                     return std::make_unique<CallExpr>(fullName, std::move(args), line, col);
                 }
@@ -677,7 +710,7 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
             } else {
                 for (int i = 0; i < arity; ++i) {
                     if (i > 0) match(TokenType::COMMA);
-                    args.push_back(parseUnary());
+                    args.push_back(parseExpression());
                 }
             }
             return std::make_unique<CallExpr>(id, std::move(args), line, col);
