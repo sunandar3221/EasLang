@@ -18,6 +18,24 @@ Parser::Parser(std::vector<Token> tokens)
     functionArity_["io.read"] = 1;
     functionArity_["io.write"] = 2;
     functionArity_["io.print"] = 1;
+    functionArity_["math.sqrt"] = 1;
+    functionArity_["math.abs"] = 1;
+    functionArity_["math.pow"] = 2;
+    functionArity_["math.floor"] = 1;
+    functionArity_["math.ceil"] = 1;
+    functionArity_["math.round"] = 1;
+    functionArity_["math.min"] = 2;
+    functionArity_["math.max"] = 2;
+    functionArity_["math.random"] = 0;
+    functionArity_["time.sleep"] = 1;
+    functionArity_["time.now"] = 0;
+    functionArity_["net.get"] = 1;
+    functionArity_["net.send"] = 2;
+    functionArity_["http.get"] = 1;
+    functionArity_["http.send"] = 2;
+    functionArity_["gui.app"] = 1;
+    functionArity_["gui.window"] = 2;
+    functionArity_["gui.run"] = 0;
 }
 
 bool Parser::isAtEnd() const {

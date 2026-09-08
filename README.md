@@ -147,18 +147,22 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code EasL
 
 ## 3. Kursus Kilat EasLang (Crash Course)
 
-### Bab 1: Output Pertama & Variabel
-Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`.
+### Bab 1: Output & Variabel Dinamis
+Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan `print` mendukung multi-argumen dengan spasi pemisah, penggabungan string, maupun pemanggilan dengan tanda kurung:
 
 ```eas
 name = "Budi"
 age = 20
+
 print name
 print age
+print "Halo nama saya " + name
+print "Nama:", name, "Umur:", age
+print("Halo Dunia")
 ```
 
 ### Bab 2: Operasi Aritmatika & Ekspresi
-EasLang mendukung operator standar `+`, `-`, `*`, `/`, `%` dengan prioritas matematis yang benar serta pengelompokan menggunakan tanda kurung `()`.
+EasLang mendukung operator standar `+`, `-`, `*`, `/`, `%` dengan prioritas matematis yang benar serta pengelompokan menggunakan tanda kurung `()`:
 
 ```eas
 val1 = 100
@@ -167,6 +171,7 @@ sum = val1 + val2
 diff = val1 - val2
 prod = val1 * val2
 quot = val1 / val2
+
 print sum
 print diff
 print prod
@@ -174,7 +179,7 @@ print quot
 ```
 
 ### Bab 3: List / Array Dinamis
-List dideklarasikan dengan kurung siku `[]` dan diakses menggunakan indeks berbasis nol `[i]`.
+List dideklarasikan dengan kurung siku `[]` dan diakses menggunakan indeks berbasis nol `[i]`:
 
 ```eas
 names = ["Budi", "Andi", "Sari"]
@@ -184,7 +189,7 @@ print names[2]
 ```
 
 ### Bab 4: Percabangan (`if` - `else`)
-Percabangan menggunakan kata kunci `if` dan `else` berbasis indentasi tanpa tanda kurung kurawal atau titik dua. Keyword `end` dapat digunakan secara opsional.
+Percabangan menggunakan kata kunci `if` dan `else` berbasis indentasi bersih tanpa kurung kurawal atau titik dua. Keyword `end` dapat digunakan secara opsional:
 
 ```eas
 age = 20
@@ -195,7 +200,7 @@ else
 ```
 
 ### Bab 5: Perulangan (`loop` & `while`)
-- Gunakan `loop <jumlah>` untuk mengulang blok sebanyak $n$ kali.
+- Gunakan `loop <jumlah>` untuk mengulang blok sebanyak $n$ kali secara terhitung.
 - Gunakan `while <kondisi>` untuk perulangan berbasis evaluasi kondisi.
 
 ```eas
@@ -209,23 +214,28 @@ while counter > 0
 ```
 
 #### Loop Assignment & `silent_print`
-Ekspresi `loop` dapat ditugaskan langsung ke variabel untuk mengumpulkan seluruh outputnya. Gunakan `silent_print` agar memformat baris teks tanpa membanjiri layar terminal:
+Hasil evaluasi `loop` dapat ditugaskan langsung ke variabel untuk mengumpulkan seluruh outputnya. Gunakan `silent_print` agar memformat dan menampung baris teks tanpa membanjiri layar terminal (karena operasi berkas memerlukan `io`, pastikan memuat `use io`):
 
 ```eas
+use io
+
 halo = loop 3000
     silent_print "kamu manusia apa apa"
 
 write "hai.txt" halo
 ```
 
-### Bab 6: Fungsi & Implicit Return (`fn`)
-Fungsi dideklarasikan dengan kata kunci `fn`, diikuti nama fungsi dan parameter yang dipisahkan spasi. **Tidak diperlukan keyword `return`**: baris atau ekspresi terakhir dalam fungsi otomatis menjadi nilai baliknya.
+### Bab 6: Fungsi, First-Class Functions, & Implicit Return (`fn`)
+Fungsi dideklarasikan dengan kata kunci `fn`, diikuti nama fungsi dan parameter yang dipisahkan spasi.
+- **Implicit Return**: Baris atau ekspresi terakhir dalam fungsi otomatis menjadi nilai baliknya tanpa perlu keyword `return`.
+- **Fleksibilitas Pemanggilan**: Fungsi dapat dipanggil dengan gaya perintah `add 10 20` maupun gaya kurung `add(10, 20)`.
 
 ```eas
 fn add a b
     a + b
 
 print add 10 20
+print add(10, 20)
 
 fn multiply x y
     x * y
@@ -233,10 +243,21 @@ fn multiply x y
 print multiply 6 7
 ```
 
-Pemanggilan fungsi dapat ditulis dengan gaya perintah `add 10 20` maupun gaya kurung `add(10, 20)`.
+#### Memasukkan Fungsi ke Variabel (First-Class Functions)
+Fungsi di EasLang dapat disimpan ke dalam variabel dan dideklarasikan secara dinamis:
 
-### Bab 7: Pustaka I/O & Input Interaktif (`use io`, `input`, `read`, `write`)
-Untuk menggunakan fitur input-output berkas dan interaksi pengguna, Anda **wajib** memuat pustaka `io` terlebih dahulu menggunakan `use io` atau `import io` (seperti halnya di Python).
+```eas
+operasi = add
+print operasi 15 25
+
+kali = fn x y
+    x * y
+
+print kali 4 5
+```
+
+### Bab 7: Pustaka I/O & Input Interaktif (`use io` / `import io`)
+Untuk menggunakan fitur input-output berkas dan interaksi pengguna, Anda **wajib** memuat pustaka `io` terlebih dahulu menggunakan `use io` atau `import io` (seperti halnya di Python):
 
 ```eas
 use io
@@ -252,29 +273,37 @@ isi = io.read "catatan.txt"
 print isi
 ```
 
-### Bab 8: Objek & State Management (`new`, `set`, `get`)
-Buat objek map/state baru dengan `new`, atur properti dengan `set`, dan ambil nilainya dengan `get`.
+### Bab 8: Objek, State Management & Dot Notation (`new`, `set`, `get`)
+Buat objek map/state baru dengan `new`, atur properti dengan `set`, dan ambil nilainya dengan `get` atau notasi titik (`.`):
 
 ```eas
 person = new
 set person "role" "Engineer"
 set person "level" "Senior"
+
 print get person "role"
-print get person "level"
+print person.level
+
+set person "sapa" (fn nama
+    "Halo " + nama)
 ```
 
-### Bab 9: Jaringan & HTTP Client (`get`, `send`)
-Permintaan HTTP GET dapat dilakukan langsung dengan keyword `get <url>`, dan pengiriman data dengan `send <url> <data>`.
+### Bab 9: Jaringan & HTTP Client (`use net`, `net.get`, `net.send`)
+Permintaan HTTP GET dapat dilakukan langsung dengan memuat library `net`:
 
 ```eas
-response = get "httpbin.org"
+use net
+
+response = net.get "httpbin.org"
 print response
 ```
 
-### Bab 10: Aplikasi Desktop Native Win32 (`app`, `window`, `run`)
+### Bab 10: Aplikasi Desktop Native Win32 (`use gui`, `app`, `window`, `run`)
 Membangun antarmuka jendela desktop native secara langsung:
 
 ```eas
+use gui
+
 app "Aplikasi Saya"
 window 800 600
 print "Desktop window siap"
@@ -337,9 +366,11 @@ fn luas_lingkaran r
 > 💡 **Tips Pengorganisasian dengan Objek (Namespacing):**
 > Anda juga dapat membungkus fungsi-fungsi library ke dalam suatu objek:
 > ```eas
+> sapaFn = fn nama
+>     "Halo " + nama
+> 
 > helper = new
-> set helper "sapa" (fn nama
->     "Halo " + nama)
+> set helper "sapa" sapaFn
 > ```
 
 ---
@@ -388,17 +419,20 @@ EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 | `else` | Logika | Blok alternatif jika kondisi `if` sebelumnya bernilai salah | `else` |
 | `loop` | Iterasi | Mengulang eksekusi blok sebanyak $n$ kali secara terhitung | `loop 10` |
 | `while` | Iterasi | Mengulang eksekusi blok selama ekspresi kondisional bernilai benar | `while x > 0` |
-| `fn` | Fungsi | Mendeklarasikan fungsi baru dengan implicit return pada ekspresi terakhir | `fn calc a b` |
-| `use` | Modul | Mengimpor dan mengeksekusi modul file `.eas` eksternal | `use "helper"` |
+| `fn` | Fungsi | Mendeklarasikan fungsi baru dengan implicit return pada ekspresi terakhir (mendukung first-class functions) | `fn calc a b` atau `f = fn x` |
+| `use` | Modul | Mengimpor dan mengeksekusi modul file `.eas` eksternal atau pustaka bawaan | `use io` atau `use "helper"` |
+| `import` | Modul | Sinonim modern dari `use` untuk memuat library standar atau modul kustom | `import io` atau `import math` |
+| `input` | Input I/O | Meminta input teks interaktif dari pengguna (tersedia setelah memuat `use io` / `import io`) | `nama = input "Nama: "` |
+| `ask` | Input I/O | Alternatif meminta respon teks pengguna (`io.ask`) | `hobi = io.ask("Hobi: ")` |
 | `new` | Objek | Menginstansiasi map/objek baru di memori | `user = new` |
 | `get` | Objek / HTTP | Mengambil properti objek (`get obj "key"`) atau melakukan HTTP GET (`get "url"`) | `get user "name"` |
 | `set` | Objek | Menetapkan nilai properti pada objek/map (`set obj "key" val`) | `set user "age" 25` |
-| `read` | File I/O | Membaca seluruh konten berkas teks dan mengembalikannya sebagai string | `text = read "data.txt"` |
-| `write` | File I/O | Menulis teks ke berkas target secara native | `write "data.txt" "Konten"` |
+| `read` | File I/O | Membaca seluruh konten berkas teks (wajib memuat `use io` / `import io` terlebih dahulu) | `text = read "data.txt"` |
+| `write` | File I/O | Menulis teks ke berkas target secara native (wajib memuat `use io` / `import io` terlebih dahulu) | `write "data.txt" "Konten"` |
 | `send` | Jaringan | Mengirimkan data teks/payload ke URL tujuan (HTTP POST / Socket) | `send "url" payload` |
-| `app` | Desktop GUI | Menetapkan judul untuk aplikasi jendela desktop | `app "Title Window"` |
-| `window` | Desktop GUI | Mengatur lebar dan tinggi jendela GUI desktop native | `window 1024 768` |
-| `run` | Desktop GUI | Memulai message pump dan lifecycle aplikasi desktop native | `run` atau `run 1000` |
+| `app` | Desktop GUI | Menetapkan judul untuk aplikasi jendela desktop (`use gui`) | `app "Title Window"` |
+| `window` | Desktop GUI | Mengatur lebar dan tinggi jendela GUI desktop native (`use gui`) | `window 1024 768` |
+| `run` | Desktop GUI | Memulai message pump dan lifecycle aplikasi desktop native (`use gui`) | `run` atau `run 1000` |
 | `end` | Struktur | Keyword penutup blok opsional bagi pengguna yang tidak ingin menggunakan indentasi murni | `end` |
 
 ### Kamus Operator & Simbol
@@ -406,6 +440,7 @@ EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 | Operator | Fungsi | Penjelasan Singkat |
 | :--- | :--- | :--- |
 | `=` | Penetapan Nilai | Menyimpan hasil evaluasi ekspresi ke variabel |
+| `.` | Member Access | Mengakses properti objek atau fungsi pustaka (`io.write`, `math.sqrt`, `person.role`) |
 | `+` | Penjumlahan / Konkatenasi | Menjumlahkan dua angka atau menggabungkan string |
 | `-` | Pengurangan / Negasi | Mengurangi nilai atau memberikan nilai negatif |
 | `*` | Perkalian | Mengalikan nilai numerik |
@@ -415,7 +450,7 @@ EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 | `<`, `>`, `<=`, `>=` | Relasional | Membandingkan besar-kecil nilai |
 | `and`, `or`, `not` | Logika Boolean | Operator logika AND, OR, dan Negasi |
 | `[]` | Indexer / Array Literal | Membuat list literal atau mengakses elemen berdasarkan indeks |
-| `()` | Pengelompokan | Mengatur urutan prioritas evaluasi ekspresi |
+| `()` | Pengelompokan / Panggilan | Mengatur urutan prioritas evaluasi ekspresi atau memanggil fungsi |
 
 ---
 
