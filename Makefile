@@ -17,9 +17,10 @@ else
     TARGET = eas
 endif
 
-SRCS = src/AotGenerator.cpp src/Bytecode.cpp src/BytecodeCompiler.cpp \
-       src/Interpreter.cpp src/Lexer.cpp src/Main.cpp src/Parser.cpp \
-       src/Repl.cpp src/StandardLibrary.cpp src/VM.cpp src/Value.cpp
+SRCS = src/AST.cpp src/AotGenerator.cpp src/Bytecode.cpp src/BytecodeCompiler.cpp \
+       src/Environment.cpp src/Interpreter.cpp src/Lexer.cpp src/Main.cpp \
+       src/Parser.cpp src/Repl.cpp src/StandardLibrary.cpp src/Token.cpp \
+       src/VM.cpp src/Value.cpp
 
 all: $(TARGET)
 

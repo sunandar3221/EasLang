@@ -148,6 +148,25 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             return sp;
         }
 
+        if (callee == "len" && !call->arguments.empty()) {
+            return "([&](){ Value arg = Value(" + generateExpr(call->arguments[0].get()) + "); if (arg.isList()) return Value(static_cast<int64_t>(arg.listVal ? arg.listVal->size() : 0)); if (arg.isString()) return Value(static_cast<int64_t>(arg.strVal.size())); if (arg.isObject()) return Value(static_cast<int64_t>(arg.objVal ? arg.objVal->size() : 0)); return Value(static_cast<int64_t>(0)); })()";
+        }
+        if (callee == "push" && call->arguments.size() >= 2) {
+            return "([&](){ Value target = Value(" + generateExpr(call->arguments[0].get()) + "); Value val = Value(" + generateExpr(call->arguments[1].get()) + "); if (target.isList()) { if (!target.listVal) target.listVal = std::make_shared<std::vector<Value>>(); target.listVal->push_back(val); } return val; })()";
+        }
+        if (callee == "pop" && !call->arguments.empty()) {
+            return "([&](){ Value target = Value(" + generateExpr(call->arguments[0].get()) + "); if (target.isList() && target.listVal && !target.listVal->empty()) { Value popped = target.listVal->back(); target.listVal->pop_back(); return popped; } return Value(); })()";
+        }
+        if (callee == "str" && !call->arguments.empty()) {
+            return "Value((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
+        }
+        if (callee == "int" && !call->arguments.empty()) {
+            return "Value((Value(" + generateExpr(call->arguments[0].get()) + ")).asInt())";
+        }
+        if (callee == "float" && !call->arguments.empty()) {
+            return "Value((Value(" + generateExpr(call->arguments[0].get()) + ")).asFloat())";
+        }
+
         if ((callee == "lower" || callee == "to_lower" || callee == "lowercase" || callee == "kecil" || callee == "str.lower") && !call->arguments.empty()) {
             return "StandardLibrary::toLower((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
         }
@@ -201,6 +220,85 @@ std::string AotGenerator::generateExpr(Expr* expr) {
 
     if (dynamic_cast<NewExpr*>(expr)) {
         return "Value::makeObject()";
+    }
+
+    if (auto* ifExpr = dynamic_cast<IfExpr*>(expr)) {
+        std::string cond = generateExpr(ifExpr->condition.get());
+        std::string s = "([&]() -> Value {\n";
+        s += "    if (" + cond + ") {\n";
+        for (size_t i = 0; ifExpr->thenBranch && i < ifExpr->thenBranch->statements.size(); ++i) {
+            auto* st = ifExpr->thenBranch->statements[i].get();
+            if (i + 1 == ifExpr->thenBranch->statements.size()) {
+                if (auto* es = dynamic_cast<ExprStmt*>(st)) {
+                    s += "        return Value(" + generateExpr(es->expression.get()) + ");\n";
+                } else {
+                    std::ostringstream oss;
+                    generateStmt(st, oss);
+                    s += oss.str();
+                    s += "        return Value();\n";
+                }
+            } else {
+                std::ostringstream oss;
+                generateStmt(st, oss);
+                s += oss.str();
+            }
+        }
+        if (!ifExpr->thenBranch || ifExpr->thenBranch->statements.empty()) {
+            s += "        return Value();\n";
+        }
+        s += "    } else {\n";
+        if (ifExpr->elseBranch) {
+            for (size_t i = 0; i < ifExpr->elseBranch->statements.size(); ++i) {
+                auto* st = ifExpr->elseBranch->statements[i].get();
+                if (i + 1 == ifExpr->elseBranch->statements.size()) {
+                    if (auto* es = dynamic_cast<ExprStmt*>(st)) {
+                        s += "        return Value(" + generateExpr(es->expression.get()) + ");\n";
+                    } else {
+                        std::ostringstream oss;
+                        generateStmt(st, oss);
+                        s += oss.str();
+                        s += "        return Value();\n";
+                    }
+                } else {
+                    std::ostringstream oss;
+                    generateStmt(st, oss);
+                    s += oss.str();
+                }
+            }
+        }
+        s += "        return Value();\n";
+        s += "    }\n";
+        s += "})()";
+        return s;
+    }
+
+    if (auto* loopExpr = dynamic_cast<LoopExpr*>(expr)) {
+        std::string cnt = generateExpr(loopExpr->count.get());
+        std::string s = "([&]() -> Value {\n";
+        s += "    int64_t _n = Value(" + cnt + ").asInt();\n";
+        s += "    std::string _acc = \"\";\n";
+        s += "    for (int64_t _i = 0; _i < _n; ++_i) {\n";
+        for (const auto& st : loopExpr->body->statements) {
+            if (auto* ps = dynamic_cast<PrintStmt*>(st.get())) {
+                s += "        _acc += (";
+                s += ps->silent ? "StandardLibrary::silentPrint(std::vector<Value>{" : "StandardLibrary::print(std::vector<Value>{";
+                for (size_t i = 0; i < ps->arguments.size(); ++i) {
+                    if (i > 0) s += ", ";
+                    s += "Value(" + generateExpr(ps->arguments[i].get()) + ")";
+                }
+                s += "})).toString();\n";
+            } else if (auto* es = dynamic_cast<ExprStmt*>(st.get())) {
+                s += "        _acc += (Value(" + generateExpr(es->expression.get()) + ")).toString();\n";
+            } else {
+                std::ostringstream oss;
+                generateStmt(st.get(), oss);
+                s += oss.str();
+            }
+        }
+        s += "    }\n";
+        s += "    return Value(_acc);\n";
+        s += "})()";
+        return s;
     }
 
     return "Value()";

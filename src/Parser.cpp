@@ -36,6 +36,12 @@ Parser::Parser(std::vector<Token> tokens)
     functionArity_["gui.app"] = 1;
     functionArity_["gui.window"] = 2;
     functionArity_["gui.run"] = 0;
+    functionArity_["len"] = 1;
+    functionArity_["push"] = 2;
+    functionArity_["pop"] = 1;
+    functionArity_["str"] = 1;
+    functionArity_["int"] = 1;
+    functionArity_["float"] = 1;
     functionArity_["lower"] = 1;
     functionArity_["to_lower"] = 1;
     functionArity_["lowercase"] = 1;

@@ -469,6 +469,25 @@ Value VM::run(Chunk* chunk) {
                     else if (arg.isString()) *top++ = Value(static_cast<int64_t>(arg.strVal.size()));
                     else if (arg.isObject()) *top++ = Value(static_cast<int64_t>(arg.objVal ? arg.objVal->size() : 0));
                     else *top++ = Value(static_cast<int64_t>(0));
+                } else if (name == "push" && argCount >= 2) {
+                    Value val = *(--top);
+                    Value target = *(--top);
+                    top -= (argCount - 2);
+                    if (target.isList()) {
+                        if (!target.listVal) target.listVal = std::make_shared<std::vector<Value>>();
+                        target.listVal->push_back(val);
+                    }
+                    *top++ = val;
+                } else if (name == "pop" && argCount >= 1) {
+                    Value target = *(--top);
+                    top -= (argCount - 1);
+                    if (target.isList() && target.listVal && !target.listVal->empty()) {
+                        Value popped = target.listVal->back();
+                        target.listVal->pop_back();
+                        *top++ = popped;
+                    } else {
+                        *top++ = Value();
+                    }
                 } else if (name == "str") {
                     Value arg = argCount > 0 ? *(--top) : Value("");
                     *top++ = Value(arg.toString());

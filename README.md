@@ -147,12 +147,15 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code EasL
 
 ## 3. Kursus Kilat EasLang (Crash Course)
 
-### Bab 1: Output & Variabel Dinamis
-Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan `print` mendukung multi-argumen dengan spasi pemisah, penggabungan string, maupun pemanggilan dengan tanda kurung:
+### Bab 1: Output, Variabel Dinamis & Komentar
+Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan `print` mendukung multi-argumen dengan spasi pemisah, penggabungan string, maupun pemanggilan dengan tanda kurung. Komentar dapat ditulis menggunakan `#` (gaya Python/Ruby) maupun `//` (gaya C/JavaScript):
 
 ```eas
+# Ini adalah komentar satu baris gaya Python
+// Ini adalah komentar satu baris gaya C/JS
+
 name = "Budi"
-age = 20
+age = 20  # Variabel dinamis otomatis terdefinisi
 
 print name
 print age
@@ -178,19 +181,32 @@ print prod
 print quot
 ```
 
-### Bab 3: List / Array Dinamis
-List dideklarasikan dengan kurung siku `[]` dan diakses menggunakan indeks berbasis nol `[i]`:
+### Bab 3: List / Array Dinamis (`push`, `pop`, `len`)
+List dideklarasikan dengan kurung siku `[]` dan diakses menggunakan indeks berbasis nol `[i]`. Tersedia fungsi bawaan `len(list)` untuk mengetahui panjang list, `push(list, item)` untuk menambah elemen, dan `pop(list)` untuk mengambil elemen terakhir:
 
 ```eas
-names = ["Budi", "Andi", "Sari"]
-print names[0]
-print names[1]
-print names[2]
+buah = ["Apel", "Jeruk"]
+
+# Menambah elemen baru ke list
+push(buah, "Mangga")
+
+# Mengetahui jumlah elemen dalam list
+print len(buah)          # Output: 3
+
+# Mengakses elemen berdasarkan indeks
+print buah[0]            # Output: Apel
+print buah[2]            # Output: Mangga
+
+# Mengambil dan menghapus elemen terakhir
+terakhir = pop(buah)
+print "Dihapus: " + terakhir  # Output: Mangga
+print len(buah)          # Output: 2
 ```
 
-### Bab 4: Percabangan (`if` - `else`)
-Percabangan menggunakan kata kunci `if` dan `else` berbasis indentasi bersih tanpa kurung kurawal atau titik dua. Keyword `end` dapat digunakan secara opsional:
+### Bab 4: Percabangan (`if` - `else`), If Expression, & Pencocokan Teks
+Percabangan menggunakan kata kunci `if` dan `else` berbasis indentasi bersih tanpa kurung kurawal atau titik dua. Keyword `end` dapat digunakan secara opsional.
 
+#### 1. Percabangan Standar
 ```eas
 age = 20
 if age >= 18
@@ -199,7 +215,20 @@ else
     print "Minor"
 ```
 
-#### Pencocokan Teks: Case Sensitive & Incase Sensitive
+#### 2. If Expression (Menugaskan Nilai Percabangan ke Variabel)
+Hasil evaluasi `if` dapat ditugaskan langsung ke sebuah variabel sebagai ekspresi yang sangat bersih (*clean ternary*):
+```eas
+nilai = 85
+
+status = if nilai >= 75
+    "Selamat Anda Lulus"
+else
+    "Silakan Mengulang Ujian"
+
+print status  # Output: Selamat Anda Lulus
+```
+
+#### 3. Pencocokan Teks: Case Sensitive & Incase Sensitive
 EasLang menyediakan fungsi bawaan untuk membedakan maupun menyamakan perbandingan string antara huruf kapital dan non-kapital:
 - **`case_sensitive(a, b)`**: Membedakan huruf kapital dan non-kapital secara ketat (menghasilkan `true` jika kedua teks persis sama, misal `"Agus"` dengan `"Agus"` adalah `true`, tapi `"Agus"` dengan `"agus"` adalah `false`).
 - **`incase_sensitive(a, b)`**: Menyamakan huruf kapital dan non-kapital (*case-insensitive*, menghasilkan `true` meskipun huruf besar/kecil berbeda, misal `"Agus"` dengan `"agus"` adalah `true`).
@@ -432,54 +461,134 @@ EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 
 ---
 
-## 4. Kamus Keyword & Operator
+### Bab 12: Fungsi Bawaan Global & Konversi Tipe Data
 
-### Kamus Keyword Lengkap
+EasLang menyediakan fungsi bawaan global tingkat sistem yang dapat digunakan langsung tanpa perlu memuat pustaka tambahan:
+
+#### 1. Konversi Tipe Data
+- **`str(val)`**: Mengonversi nilai apa pun (angka, boolean, list, objek) menjadi bentuk teks string.
+- **`int(val)`**: Mengonversi nilai angka/string menjadi integer 64-bit.
+- **`float(val)`**: Mengonversi nilai menjadi floating-point presisi ganda (64-bit float).
+
+```eas
+teks = "123"
+angka = int(teks)
+desimal = float("3.1415")
+hasilGabung = "Nilai: " + str(angka)
+print hasilGabung
+```
+
+#### 2. Inspeksi Ukuran & Koleksi Data
+- **`len(target)`**: Menghitung panjang karakter string, jumlah elemen list, atau jumlah kunci pada objek map.
+- **`push(list, val)`**: Menambahkan elemen ke urutan terakhir list.
+- **`pop(list)`**: Mengambil dan menghapus elemen terakhir list.
+
+```eas
+# Mengetahui panjang string & list
+print len("EasLang")          # Output: 7
+
+daftar = [10, 20]
+push(daftar, 30)
+print len(daftar)             # Output: 3
+print pop(daftar)             # Output: 30
+```
+
+#### 3. Manipulasi & Pencocokan String
+- **`lower(str)`**: Mengubah teks menjadi huruf kecil (*lowercase*).
+- **`upper(str)`**: Mengubah teks menjadi huruf kapital (*uppercase*).
+- **`case_sensitive(a, b)`**: Memeriksa apakah dua teks sama persis dengan membedakan huruf kapital.
+- **`incase_sensitive(a, b)`**: Memeriksa apakah dua teks sama dengan menyamakan huruf kapital/non-kapital (*case-insensitive*).
+
+```eas
+kalimat = "Belajar EasLang"
+print lower(kalimat)          # Output: belajar easlang
+print upper(kalimat)          # Output: BELAJAR EASLANG
+
+user1 = "admin"
+user2 = "ADMIN"
+print incase_sensitive(user1, user2)  # Output: true
+print case_sensitive(user1, user2)    # Output: false
+```
+
+---
+
+## 4. Kamus Keyword, Fungsi Bawaan & Operator
+
+### 4.1 Kamus Keyword Utama
 
 | Keyword | Kategori | Fungsi & Keterangan | Contoh Kode |
 | :--- | :--- | :--- | :--- |
-| `print` | Output | Menampilkan satu atau beberapa ekspresi ke konsol standar dengan spasi pemisah dan diakhiri baris baru | `print "Halo" 123` |
-| `silent_print` | Output | Memformat teks seperti `print` tanpa mencetak ke terminal konsol (mencegah banjir output saat pengulangan data) | `silent_print "Data"` |
-| `if` | Logika | Memulai blok percabangan kondisional berdasarkan nilai kebenaran (*truthiness*) | `if score > 75` |
+| `print` | Output | Menampilkan satu atau beberapa nilai ke konsol standar dengan spasi pemisah dan diakhiri baris baru | `print "Halo" 123` |
+| `silent_print` | Output | Memformat teks seperti `print` tanpa mencetak ke konsol terminal (menampung output untuk loop assignment) | `silent_print "Data"` |
+| `if` | Logika | Memulai blok percabangan kondisional berbasis indentasi bersih | `if score > 75` |
 | `else` | Logika | Blok alternatif jika kondisi `if` sebelumnya bernilai salah | `else` |
 | `loop` | Iterasi | Mengulang eksekusi blok sebanyak $n$ kali secara terhitung | `loop 10` |
 | `while` | Iterasi | Mengulang eksekusi blok selama ekspresi kondisional bernilai benar | `while x > 0` |
-| `fn` | Fungsi | Mendeklarasikan fungsi baru dengan implicit return pada ekspresi terakhir (mendukung first-class functions) | `fn calc a b` atau `f = fn x` |
-| `use` | Modul | Mengimpor dan mengeksekusi modul file `.eas` eksternal atau pustaka bawaan | `use io` atau `use "helper"` |
-| `import` | Modul | Sinonim modern dari `use` untuk memuat library standar atau modul kustom | `import io` atau `import math` |
-| `input` | Input I/O | Meminta input teks interaktif dari pengguna (tersedia setelah memuat `use io` / `import io`) | `nama = input "Nama: "` |
-| `ask` | Input I/O | Alternatif meminta respon teks pengguna (`io.ask`) | `hobi = io.ask("Hobi: ")` |
-| `new` | Objek | Menginstansiasi map/objek baru di memori | `user = new` |
+| `fn` | Fungsi | Mendeklarasikan fungsi baru dengan implicit return pada ekspresi terakhir (mendukung lambda) | `fn calc a b` atau `f = fn x` |
+| `use` | Modul | Mengimpor berkas modul `.eas` eksternal atau pustaka bawaan | `use io` atau `use "helper"` |
+| `import` | Modul | Sinonim modern dari `use` untuk memuat modul atau library standar | `import io` atau `import math` |
+| `new` | Objek | Menginstansiasi objek map/state baru di memori | `user = new` |
 | `get` | Objek / HTTP | Mengambil properti objek (`get obj "key"`) atau melakukan HTTP GET (`get "url"`) | `get user "name"` |
 | `set` | Objek | Menetapkan nilai properti pada objek/map (`set obj "key" val`) | `set user "age" 25` |
-| `read` | File I/O | Membaca seluruh konten berkas teks (wajib memuat `use io` / `import io` terlebih dahulu) | `text = read "data.txt"` |
-| `write` | File I/O | Menulis teks ke berkas target secara native (wajib memuat `use io` / `import io` terlebih dahulu) | `write "data.txt" "Konten"` |
+| `read` | File I/O | Membaca seluruh isi berkas teks (membutuhkan `use io` / `import io`) | `text = read "data.txt"` |
+| `write` | File I/O | Menulis teks ke berkas target secara native (membutuhkan `use io` / `import io`) | `write "data.txt" "Konten"` |
 | `send` | Jaringan | Mengirimkan data teks/payload ke URL tujuan (HTTP POST / Socket) | `send "url" payload` |
 | `app` | Desktop GUI | Menetapkan judul untuk aplikasi jendela desktop (`use gui`) | `app "Title Window"` |
 | `window` | Desktop GUI | Mengatur lebar dan tinggi jendela GUI desktop native (`use gui`) | `window 1024 768` |
 | `run` | Desktop GUI | Memulai message pump dan lifecycle aplikasi desktop native (`use gui`) | `run` atau `run 1000` |
-| `case_sensitive` | Logika Teks | Membandingkan dua string dengan membedakan huruf kapital (*case-sensitive*) | `case_sensitive(a, b)` |
-| `incase_sensitive` | Logika Teks | Membandingkan dua string dengan menyamakan huruf kapital (*case-insensitive*) | `incase_sensitive(a, b)` |
-| `lower` | Teks | Mengubah seluruh karakter teks menjadi huruf kecil non-kapital | `lower "HALO"` |
-| `upper` | Teks | Mengubah seluruh karakter teks menjadi huruf besar kapital | `upper "halo"` |
-| `end` | Struktur | Keyword penutup blok opsional bagi pengguna yang tidak ingin menggunakan indentasi murni | `end` |
+| `end` | Struktur | Keyword penutup blok opsional bagi pengguna yang ingin penutup eksplisit | `end` |
+| `true` | Nilai | Literal boolean benar | `isAktif = true` |
+| `false` | Nilai | Literal boolean salah | `isAktif = false` |
+| `nil` / `null` | Nilai | Literal nilai kosong / ketiadaan nilai | `data = nil` |
 
-### Kamus Operator & Simbol
+### 4.2 Kamus Fungsi Bawaan Global (Built-in Functions)
 
-| Operator | Fungsi | Penjelasan Singkat |
-| :--- | :--- | :--- |
-| `=` | Penetapan Nilai | Menyimpan hasil evaluasi ekspresi ke variabel |
-| `.` | Member Access | Mengakses properti objek atau fungsi pustaka (`io.write`, `math.sqrt`, `person.role`) |
-| `+` | Penjumlahan / Konkatenasi | Menjumlahkan dua angka atau menggabungkan string |
-| `-` | Pengurangan / Negasi | Mengurangi nilai atau memberikan nilai negatif |
-| `*` | Perkalian | Mengalikan nilai numerik |
-| `/` | Pembagian | Membagi dua angka secara presisi |
-| `%` | Modulo | Menghitung sisa hasil bagi |
-| `==`, `!=` | Kesetaraan | Memeriksa kesamaan atau perbedaan dua nilai |
-| `<`, `>`, `<=`, `>=` | Relasional | Membandingkan besar-kecil nilai |
-| `and`, `or`, `not` | Logika Boolean | Operator logika AND, OR, dan Negasi |
-| `[]` | Indexer / Array Literal | Membuat list literal atau mengakses elemen berdasarkan indeks |
-| `()` | Pengelompokan / Panggilan | Mengatur urutan prioritas evaluasi ekspresi atau memanggil fungsi |
+Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use:
+
+| Fungsi | Parameter | Nilai Balik | Keterangan & Contoh |
+| :--- | :--- | :--- | :--- |
+| `len(x)` | String, List, Objek | `int` | Menghitung panjang teks, jumlah item list, atau jumlah properti objek (`len("Halo")` $\rightarrow$ `4`) |
+| `str(x)` | Nilai apa saja | `string` | Mengonversi nilai apa pun menjadi string (`str(123)` $\rightarrow$ `"123"`) |
+| `int(x)` | Angka, String | `int` | Mengonversi nilai menjadi integer 64-bit (`int("50")` $\rightarrow$ `50`) |
+| `float(x)` | Angka, String | `float` | Mengonversi nilai menjadi angka pecahan floating-point (`float("3.14")` $\rightarrow$ `3.14`) |
+| `push(list, val)` | List, Nilai baru | `val` | Menambahkan elemen baru ke akhir list (`push(buah, "Apel")`) |
+| `pop(list)` | List | Nilai terakhir | Menghapus dan mengembalikan elemen terakhir list (`terakhir = pop(buah)`) |
+| `case_sensitive(a, b)` | Dua teks string | `bool` | Membandingkan dua string dengan membedakan huruf kapital (*case-sensitive*) |
+| `incase_sensitive(a, b)` | Dua teks string | `bool` | Membandingkan dua string dengan menyamakan huruf kapital (*case-insensitive*) |
+| `lower(str)` | String | `string` | Mengubah seluruh karakter teks menjadi huruf kecil (*lowercase*) |
+| `upper(str)` | String | `string` | Mengubah seluruh karakter teks menjadi huruf besar kapital (*uppercase*) |
+| `input(prompt)` | String prompt opsional | `string` | Membaca input teks interaktif dari terminal pengguna (membutuhkan `use io`) |
+| `ask(prompt)` | String prompt opsional | `string` | Sinonim dari `input` untuk meminta respon teks pengguna (membutuhkan `use io`) |
+
+### 4.3 Kamus Pustaka Standar Bawaan (Standard Modules)
+
+| Pustaka | Cara Memuat | Fitur & Fungsi Utama | Keterangan |
+| :--- | :--- | :--- | :--- |
+| **`io`** | `use io` atau `import io` | `io.input`, `io.ask`, `io.print`, `io.read`, `io.write` | Wajib dimuat untuk operasi berkas dan input keyboard pengguna |
+| **`math`** | `use math` atau `import math` | `math.sqrt`, `math.pow`, `math.abs`, `math.floor`, `math.ceil`, `math.round`, `math.min`, `math.max`, `math.random`, `math.pi` | Perhitungan dan fungsi matematis presisi tinggi |
+| **`time`** | `use time` atau `import time` | `time.now`, `time.sleep` | Pengukuran waktu (milidetik) dan jeda eksekusi program |
+| **`net`** / **`http`** | `use net` atau `import net` | `net.get`, `net.send`, `http.get`, `http.send` | Komunikasi jaringan dan request HTTP |
+| **`gui`** | `use gui` atau `import gui` | `gui.app`, `gui.window`, `gui.run` | Aplikasi GUI jendela desktop native Win32 |
+| **`str`** | `use str` atau `import str` | `str.lower`, `str.upper`, `str.case_sensitive`, `str.incase_sensitive` | Modul pembantu pemrosesan string dan manipulasi teks |
+
+### 4.4 Kamus Operator, Simbol & Komentar
+
+| Simbol / Operator | Kategori | Penjelasan Singkat | Contoh Kode |
+| :--- | :--- | :--- | :--- |
+| `#` | Komentar | Menandai baris komentar satu baris (gaya Python/Ruby) | `# Ini komentar` |
+| `//` | Komentar | Menandai baris komentar satu baris (gaya C/JavaScript) | `// Ini komentar` |
+| `=` | Penetapan Nilai | Menyimpan hasil evaluasi ekspresi ke variabel | `x = 10` |
+| `.` | Member Access | Mengakses properti objek atau fungsi pustaka | `io.write`, `person.role` |
+| `+` | Penjumlahan / Concat | Menjumlahkan dua angka atau menggabungkan string | `10 + 20`, `"A" + "B"` |
+| `-` | Pengurangan / Negasi | Mengurangi nilai atau memberikan tanda negatif | `50 - 20`, `-x` |
+| `*` | Perkalian | Mengalikan nilai numerik | `6 * 7` |
+| `/` | Pembagian | Membagi dua angka secara presisi | `100 / 4` |
+| `%` | Modulo | Menghitung sisa hasil bagi | `10 % 3` |
+| `==`, `!=` | Kesetaraan | Memeriksa kesamaan atau perbedaan dua nilai | `a == b`, `x != y` |
+| `<`, `>`, `<=`, `>=` | Relasional | Membandingkan besar-kecil nilai | `score >= 75` |
+| `and`, `or`, `not` | Logika Boolean | Operator logika AND, OR, dan NOT | `if a and not b` |
+| `[]` | Indexer / Array Literal | Membuat list literal atau mengakses elemen via indeks | `arr = [1, 2]`, `arr[0]` |
+| `()` | Prioritas / Panggilan | Mengatur prioritas ekspresi atau memanggil fungsi | `(a + b) * c`, `add(1, 2)` |
 
 ---
 

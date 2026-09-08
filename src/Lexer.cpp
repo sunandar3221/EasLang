@@ -97,7 +97,11 @@ void Lexer::handleIndentation(std::vector<Token>& tokens) {
         }
     }
 
-    if (tempCursor >= source_.size() || source_[tempCursor] == '\n') {
+    if (tempCursor >= source_.size() || source_[tempCursor] == '\n' || source_[tempCursor] == '#' ||
+        (source_[tempCursor] == '/' && tempCursor + 1 < source_.size() && source_[tempCursor + 1] == '/')) {
+        while (tempCursor < source_.size() && source_[tempCursor] != '\n') {
+            tempCursor++;
+        }
         cursor_ = tempCursor;
         column_ = tempCol;
         return;
@@ -221,6 +225,21 @@ std::vector<Token> Lexer::tokenize() {
         char c = advance();
 
         if (c == ' ' || c == '\t' || c == '\r') {
+            continue;
+        }
+
+        if (c == '#') {
+            while (!isAtEnd() && peek() != '\n') {
+                advance();
+            }
+            continue;
+        }
+
+        if (c == '/' && peek() == '/') {
+            advance();
+            while (!isAtEnd() && peek() != '\n') {
+                advance();
+            }
             continue;
         }
 
