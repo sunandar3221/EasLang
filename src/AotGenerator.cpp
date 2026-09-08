@@ -148,6 +148,33 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             return sp;
         }
 
+        if ((callee == "lower" || callee == "to_lower" || callee == "lowercase" || callee == "kecil" || callee == "str.lower") && !call->arguments.empty()) {
+            return "StandardLibrary::toLower((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
+        }
+        if ((callee == "upper" || callee == "to_upper" || callee == "uppercase" || callee == "kapital" || callee == "str.upper") && !call->arguments.empty()) {
+            return "StandardLibrary::toUpper((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
+        }
+        if (callee == "incase_sensitive" || callee == "incaseSensitive" || callee == "incase_sensitif" ||
+            callee == "incaseSensitif" || callee == "incasesensitive" || callee == "incasesensitif" ||
+            callee == "incase" || callee == "icase" || callee == "iequals" || callee == "iequal" || callee == "str.incase_sensitive") {
+            if (call->arguments.size() == 1) {
+                return "StandardLibrary::toLower((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
+            } else if (call->arguments.size() >= 2) {
+                return "StandardLibrary::incaseSensitive((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
+            }
+            return "Value(false)";
+        }
+        if (callee == "case_sensitive" || callee == "caseSensitive" || callee == "case_sensitif" ||
+            callee == "caseSensitif" || callee == "casesensitive" || callee == "casesensitif" ||
+            callee == "case" || callee == "equals" || callee == "equal" || callee == "str.case_sensitive") {
+            if (call->arguments.size() == 1) {
+                return "Value(" + generateExpr(call->arguments[0].get()) + ")";
+            } else if (call->arguments.size() >= 2) {
+                return "StandardLibrary::caseSensitive((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
+            }
+            return "Value(false)";
+        }
+
         std::string s = "fn_" + callee + "(";
         for (size_t i = 0; i < call->arguments.size(); ++i) {
             if (i > 0) s += ", ";

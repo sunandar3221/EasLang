@@ -18,6 +18,11 @@ public:
     static void setWindowSize(int width, int height);
     static Value runApp(int timeoutMs = -1);
 
+    static Value toLower(const std::string& str);
+    static Value toUpper(const std::string& str);
+    static Value caseSensitive(const std::string& a, const std::string& b);
+    static Value incaseSensitive(const std::string& a, const std::string& b);
+
     static std::string getAppTitle();
     static int getWindowWidth();
     static int getWindowHeight();

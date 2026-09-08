@@ -68,6 +68,14 @@ void VM::loadLibrary(const std::string& name) {
         guiObj.setProperty("window", Value(ValueType::FUNCTION, "gui.window"));
         guiObj.setProperty("run", Value(ValueType::FUNCTION, "gui.run"));
         globals_["gui"] = guiObj;
+    } else if (name == "str" || name == "string") {
+        Value strObj = Value::makeObject();
+        strObj.setProperty("lower", Value(ValueType::FUNCTION, "lower"));
+        strObj.setProperty("upper", Value(ValueType::FUNCTION, "upper"));
+        strObj.setProperty("case_sensitive", Value(ValueType::FUNCTION, "case_sensitive"));
+        strObj.setProperty("incase_sensitive", Value(ValueType::FUNCTION, "incase_sensitive"));
+        globals_["str"] = strObj;
+        globals_["string"] = strObj;
     } else {
         std::string filename = name;
         if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
@@ -461,6 +469,49 @@ Value VM::run(Chunk* chunk) {
                     else if (arg.isString()) *top++ = Value(static_cast<int64_t>(arg.strVal.size()));
                     else if (arg.isObject()) *top++ = Value(static_cast<int64_t>(arg.objVal ? arg.objVal->size() : 0));
                     else *top++ = Value(static_cast<int64_t>(0));
+                } else if (name == "str") {
+                    Value arg = argCount > 0 ? *(--top) : Value("");
+                    *top++ = Value(arg.toString());
+                } else if (name == "int") {
+                    Value arg = argCount > 0 ? *(--top) : Value(static_cast<int64_t>(0));
+                    *top++ = Value(arg.asInt());
+                } else if (name == "float") {
+                    Value arg = argCount > 0 ? *(--top) : Value(0.0);
+                    *top++ = Value(arg.asFloat());
+                } else if (name == "lower" || name == "to_lower" || name == "lowercase" || name == "kecil" || name == "str.lower") {
+                    Value arg = argCount > 0 ? *(--top) : Value("");
+                    *top++ = StandardLibrary::toLower(arg.toString());
+                } else if (name == "upper" || name == "to_upper" || name == "uppercase" || name == "kapital" || name == "str.upper") {
+                    Value arg = argCount > 0 ? *(--top) : Value("");
+                    *top++ = StandardLibrary::toUpper(arg.toString());
+                } else if (name == "incase_sensitive" || name == "incaseSensitive" || name == "incase_sensitif" ||
+                           name == "incaseSensitif" || name == "incasesensitive" || name == "incasesensitif" ||
+                           name == "incase" || name == "icase" || name == "iequals" || name == "iequal" || name == "str.incase_sensitive") {
+                    if (argCount == 1) {
+                        Value a = *(--top);
+                        *top++ = StandardLibrary::toLower(a.toString());
+                    } else if (argCount >= 2) {
+                        Value b = *(--top);
+                        Value a = *(--top);
+                        top -= (argCount - 2);
+                        *top++ = StandardLibrary::incaseSensitive(a.toString(), b.toString());
+                    } else {
+                        *top++ = Value(false);
+                    }
+                } else if (name == "case_sensitive" || name == "caseSensitive" || name == "case_sensitif" ||
+                           name == "caseSensitif" || name == "casesensitive" || name == "casesensitif" ||
+                           name == "case" || name == "equals" || name == "equal" || name == "str.case_sensitive") {
+                    if (argCount == 1) {
+                        Value a = *(--top);
+                        *top++ = a;
+                    } else if (argCount >= 2) {
+                        Value b = *(--top);
+                        Value a = *(--top);
+                        top -= (argCount - 2);
+                        *top++ = StandardLibrary::caseSensitive(a.toString(), b.toString());
+                    } else {
+                        *top++ = Value(false);
+                    }
                 } else if (name == "print" || name == "io.print") {
                     std::vector<Value> args;
                     for (size_t i = 0; i < argCount; ++i) {

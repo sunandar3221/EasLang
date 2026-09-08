@@ -36,6 +36,35 @@ Parser::Parser(std::vector<Token> tokens)
     functionArity_["gui.app"] = 1;
     functionArity_["gui.window"] = 2;
     functionArity_["gui.run"] = 0;
+    functionArity_["lower"] = 1;
+    functionArity_["to_lower"] = 1;
+    functionArity_["lowercase"] = 1;
+    functionArity_["kecil"] = 1;
+    functionArity_["upper"] = 1;
+    functionArity_["to_upper"] = 1;
+    functionArity_["uppercase"] = 1;
+    functionArity_["kapital"] = 1;
+    functionArity_["case_sensitive"] = 2;
+    functionArity_["caseSensitive"] = 2;
+    functionArity_["case_sensitif"] = 2;
+    functionArity_["caseSensitif"] = 2;
+    functionArity_["casesensitive"] = 2;
+    functionArity_["casesensitif"] = 2;
+    functionArity_["case"] = 2;
+    functionArity_["incase_sensitive"] = 2;
+    functionArity_["incaseSensitive"] = 2;
+    functionArity_["incase_sensitif"] = 2;
+    functionArity_["incaseSensitif"] = 2;
+    functionArity_["incasesensitive"] = 2;
+    functionArity_["incasesensitif"] = 2;
+    functionArity_["incase"] = 2;
+    functionArity_["icase"] = 2;
+    functionArity_["iequals"] = 2;
+    functionArity_["iequal"] = 2;
+    functionArity_["str.lower"] = 1;
+    functionArity_["str.upper"] = 1;
+    functionArity_["str.case_sensitive"] = 2;
+    functionArity_["str.incase_sensitive"] = 2;
 }
 
 bool Parser::isAtEnd() const {
@@ -296,7 +325,7 @@ std::unique_ptr<Stmt> Parser::parseUse() {
         mod = advance().lexeme;
     }
     match(TokenType::NEWLINE);
-    if (!mod.empty() && mod != "io" && mod != "math" && mod != "time" && mod != "net" && mod != "http" && mod != "gui") {
+    if (!mod.empty() && mod != "io" && mod != "math" && mod != "time" && mod != "net" && mod != "http" && mod != "gui" && mod != "str" && mod != "string") {
         std::string filename = mod;
         if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
             filename += ".eas";

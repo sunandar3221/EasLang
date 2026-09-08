@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cctype>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -263,4 +264,34 @@ Value StandardLibrary::runApp(int timeoutMs) {
     std::cout.flush();
     return Value(true);
 #endif
+}
+
+Value StandardLibrary::toLower(const std::string& str) {
+    std::string res = str;
+    for (char& c : res) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return Value(res);
+}
+
+Value StandardLibrary::toUpper(const std::string& str) {
+    std::string res = str;
+    for (char& c : res) {
+        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    return Value(res);
+}
+
+Value StandardLibrary::caseSensitive(const std::string& a, const std::string& b) {
+    return Value(a == b);
+}
+
+Value StandardLibrary::incaseSensitive(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) return Value(false);
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i]))) {
+            return Value(false);
+        }
+    }
+    return Value(true);
 }

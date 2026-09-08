@@ -1,8 +1,8 @@
 use io
 
-nama = io.input("Nama kamu siapa? ")
+nama = io.input("Nama kamu siapa: ")
 
 if nama == "Agus"
     print "Halo Gusion!"
 else
-    io.print  "Halo " + nama
+    print  "Halo " + nama

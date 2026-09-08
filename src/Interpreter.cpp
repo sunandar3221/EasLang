@@ -67,6 +67,14 @@ void Interpreter::loadLibrary(const std::string& name) {
         guiObj.setProperty("window", Value(ValueType::FUNCTION, "window"));
         guiObj.setProperty("run", Value(ValueType::FUNCTION, "run"));
         globalEnv_->assign("gui", guiObj);
+    } else if (name == "str" || name == "string") {
+        Value strObj = Value::makeObject();
+        strObj.setProperty("lower", Value(ValueType::FUNCTION, "lower"));
+        strObj.setProperty("upper", Value(ValueType::FUNCTION, "upper"));
+        strObj.setProperty("case_sensitive", Value(ValueType::FUNCTION, "case_sensitive"));
+        strObj.setProperty("incase_sensitive", Value(ValueType::FUNCTION, "incase_sensitive"));
+        globalEnv_->assign("str", strObj);
+        globalEnv_->assign("string", strObj);
     }
 }
 
@@ -204,7 +212,7 @@ Value Interpreter::execute(Stmt* stmt) {
 
     if (auto* useStmt = dynamic_cast<UseStmt*>(stmt)) {
         std::string mod = useStmt->moduleName;
-        if (mod == "io" || mod == "math" || mod == "time" || mod == "net" || mod == "http" || mod == "gui") {
+        if (mod == "io" || mod == "math" || mod == "time" || mod == "net" || mod == "http" || mod == "gui" || mod == "str" || mod == "string") {
             loadLibrary(mod);
             return Value(true);
         }
@@ -373,6 +381,40 @@ Value Interpreter::evaluate(Expr* expr) {
 
         if (name == "float" && !call->arguments.empty()) {
             return Value(evaluate(call->arguments[0].get()).asFloat());
+        }
+
+        if ((name == "lower" || name == "to_lower" || name == "lowercase" || name == "kecil" || name == "str.lower") && !call->arguments.empty()) {
+            return StandardLibrary::toLower(evaluate(call->arguments[0].get()).toString());
+        }
+
+        if ((name == "upper" || name == "to_upper" || name == "uppercase" || name == "kapital" || name == "str.upper") && !call->arguments.empty()) {
+            return StandardLibrary::toUpper(evaluate(call->arguments[0].get()).toString());
+        }
+
+        if (name == "incase_sensitive" || name == "incaseSensitive" || name == "incase_sensitif" ||
+            name == "incaseSensitif" || name == "incasesensitive" || name == "incasesensitif" ||
+            name == "incase" || name == "icase" || name == "iequals" || name == "iequal" || name == "str.incase_sensitive") {
+            if (call->arguments.size() == 1) {
+                return StandardLibrary::toLower(evaluate(call->arguments[0].get()).toString());
+            } else if (call->arguments.size() >= 2) {
+                std::string a = evaluate(call->arguments[0].get()).toString();
+                std::string b = evaluate(call->arguments[1].get()).toString();
+                return StandardLibrary::incaseSensitive(a, b);
+            }
+            return Value(false);
+        }
+
+        if (name == "case_sensitive" || name == "caseSensitive" || name == "case_sensitif" ||
+            name == "caseSensitif" || name == "casesensitive" || name == "casesensitif" ||
+            name == "case" || name == "equals" || name == "equal" || name == "str.case_sensitive") {
+            if (call->arguments.size() == 1) {
+                return evaluate(call->arguments[0].get());
+            } else if (call->arguments.size() >= 2) {
+                std::string a = evaluate(call->arguments[0].get()).toString();
+                std::string b = evaluate(call->arguments[1].get()).toString();
+                return StandardLibrary::caseSensitive(a, b);
+            }
+            return Value(false);
         }
 
         if (name == "input" || name == "io.input" || name == "io.ask" || name == "ask") {

@@ -199,6 +199,31 @@ else
     print "Minor"
 ```
 
+#### Pencocokan Teks: Case Sensitive & Incase Sensitive
+EasLang menyediakan fungsi bawaan untuk membedakan maupun menyamakan perbandingan string antara huruf kapital dan non-kapital:
+- **`case_sensitive(a, b)`**: Membedakan huruf kapital dan non-kapital secara ketat (menghasilkan `true` jika kedua teks persis sama, misal `"Agus"` dengan `"Agus"` adalah `true`, tapi `"Agus"` dengan `"agus"` adalah `false`).
+- **`incase_sensitive(a, b)`**: Menyamakan huruf kapital dan non-kapital (*case-insensitive*, menghasilkan `true` meskipun huruf besar/kecil berbeda, misal `"Agus"` dengan `"agus"` adalah `true`).
+- **`lower(teks)`**: Mengubah teks menjadi huruf kecil (*lowercase*).
+- **`upper(teks)`**: Mengubah teks menjadi huruf besar kapital (*uppercase*).
+
+```eas
+nama = "Agus"
+
+# Menyamakan huruf kapital dan non-kapital (Incase Sensitive)
+if incase_sensitive(nama, "agus")
+    print "Nama cocok (mengabaikan huruf besar/kecil)!"
+
+# Membedakan huruf kapital dan non-kapital (Case Sensitive)
+if case_sensitive(nama, "agus")
+    print "Sama persis"
+else
+    print "Huruf besar/kecil berbeda: 'Agus' != 'agus'"
+
+# Mengubah bentuk huruf
+print lower("Halo Dunia")  # Output: halo dunia
+print upper("halo dunia")  # Output: HALO DUNIA
+```
+
 ### Bab 5: Perulangan (`loop` & `while`)
 - Gunakan `loop <jumlah>` untuk mengulang blok sebanyak $n$ kali secara terhitung.
 - Gunakan `while <kondisi>` untuk perulangan berbasis evaluasi kondisi.
@@ -433,6 +458,10 @@ EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 | `app` | Desktop GUI | Menetapkan judul untuk aplikasi jendela desktop (`use gui`) | `app "Title Window"` |
 | `window` | Desktop GUI | Mengatur lebar dan tinggi jendela GUI desktop native (`use gui`) | `window 1024 768` |
 | `run` | Desktop GUI | Memulai message pump dan lifecycle aplikasi desktop native (`use gui`) | `run` atau `run 1000` |
+| `case_sensitive` | Logika Teks | Membandingkan dua string dengan membedakan huruf kapital (*case-sensitive*) | `case_sensitive(a, b)` |
+| `incase_sensitive` | Logika Teks | Membandingkan dua string dengan menyamakan huruf kapital (*case-insensitive*) | `incase_sensitive(a, b)` |
+| `lower` | Teks | Mengubah seluruh karakter teks menjadi huruf kecil non-kapital | `lower "HALO"` |
+| `upper` | Teks | Mengubah seluruh karakter teks menjadi huruf besar kapital | `upper "halo"` |
 | `end` | Struktur | Keyword penutup blok opsional bagi pengguna yang tidak ingin menggunakan indentasi murni | `end` |
 
 ### Kamus Operator & Simbol
