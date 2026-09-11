@@ -23,6 +23,21 @@ public:
     static Value caseSensitive(const std::string& a, const std::string& b);
     static Value incaseSensitive(const std::string& a, const std::string& b);
 
+    static Value mathSqrt(double val);
+    static Value mathAbs(double val);
+    static Value mathPow(double base, double exp);
+    static Value mathFloor(double val);
+    static Value mathCeil(double val);
+    static Value mathRound(double val);
+    static Value mathMin(double a, double b);
+    static Value mathMax(double a, double b);
+    static Value mathRandom();
+    static Value mathSin(double val);
+    static Value mathCos(double val);
+    static Value mathTan(double val);
+    static Value timeSleep(int64_t ms);
+    static Value timeNow();
+
     static std::string getAppTitle();
     static int getWindowWidth();
     static int getWindowHeight();

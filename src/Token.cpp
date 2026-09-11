@@ -1,4 +1,4 @@
-﻿#include "Token.hpp"
+#include "Token.hpp"
 
 std::string tokenTypeToString(TokenType type) {
     switch (type) {
@@ -15,6 +15,7 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::PRINT: return "PRINT";
         case TokenType::IF: return "IF";
         case TokenType::ELSE: return "ELSE";
+        case TokenType::ELIF: return "ELIF";
         case TokenType::LOOP: return "LOOP";
         case TokenType::WHILE: return "WHILE";
         case TokenType::FN: return "FN";

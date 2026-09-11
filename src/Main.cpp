@@ -32,14 +32,21 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        std::string inputFile = argv[2];
+        std::string inputFile;
         std::string outputFile = "output.exe";
 
-        for (int i = 3; i < argc; ++i) {
+        for (int i = 2; i < argc; ++i) {
             std::string arg = argv[i];
             if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
                 outputFile = argv[++i];
+            } else if (inputFile.empty() && !arg.empty() && arg[0] != '-') {
+                inputFile = arg;
             }
+        }
+
+        if (inputFile.empty()) {
+            std::cerr << "Usage: eas build <input.eas> [-o <output.exe>]\n";
+            return 1;
         }
 
         Value content = StandardLibrary::readFile(inputFile);

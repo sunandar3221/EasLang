@@ -24,6 +24,7 @@ void Lexer::initKeywords() {
     keywords_["silent_print"] = TokenType::SILENT_PRINT;
     keywords_["if"] = TokenType::IF;
     keywords_["else"] = TokenType::ELSE;
+    keywords_["elif"] = TokenType::ELIF;
     keywords_["loop"] = TokenType::LOOP;
     keywords_["while"] = TokenType::WHILE;
     keywords_["fn"] = TokenType::FN;

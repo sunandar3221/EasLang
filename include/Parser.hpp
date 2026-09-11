@@ -32,6 +32,7 @@ private:
     bool check(TokenType type) const;
     bool match(TokenType type);
     void skipNewlines();
+    bool isIndexOrPropAssign() const;
 
     std::unique_ptr<BlockStmt> parseBlock();
     std::unique_ptr<Stmt> parsePrint(bool silent = false);

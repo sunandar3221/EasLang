@@ -22,6 +22,7 @@ enum class TokenType {
     SILENT_PRINT,
     IF,
     ELSE,
+    ELIF,
     LOOP,
     WHILE,
     FN,

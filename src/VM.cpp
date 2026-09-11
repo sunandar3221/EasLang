@@ -49,8 +49,11 @@ void VM::loadLibrary(const std::string& name) {
         mathObj.setProperty("round", Value(ValueType::FUNCTION, "math.round"));
         mathObj.setProperty("min", Value(ValueType::FUNCTION, "math.min"));
         mathObj.setProperty("max", Value(ValueType::FUNCTION, "math.max"));
-        mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
+        mathObj.setProperty("sin", Value(ValueType::FUNCTION, "math.sin"));
+        mathObj.setProperty("cos", Value(ValueType::FUNCTION, "math.cos"));
+        mathObj.setProperty("tan", Value(ValueType::FUNCTION, "math.tan"));
         mathObj.setProperty("pi", Value(3.14159265358979323846));
+        mathObj.setProperty("e", Value(2.71828182845904523536));
         globals_["math"] = mathObj;
     } else if (name == "time") {
         Value timeObj = Value::makeObject();
@@ -291,7 +294,7 @@ Value VM::run(Chunk* chunk) {
                 if (b.asFloat() == 0.0) {
                     runtimeError("Division by zero", curChunk, ip, frameCount);
                 }
-                if (a.type == ValueType::INT && b.type == ValueType::INT && (a.intVal % b.intVal == 0)) {
+                if (a.type == ValueType::INT && b.type == ValueType::INT && !(a.intVal == INT64_MIN && b.intVal == -1) && (a.intVal % b.intVal == 0)) {
                     a.intVal /= b.intVal;
                 } else {
                     a = a / b;
@@ -306,7 +309,11 @@ Value VM::run(Chunk* chunk) {
                     runtimeError("Modulo by zero", curChunk, ip, frameCount);
                 }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
-                    a.intVal %= b.intVal;
+                    if (a.intVal == INT64_MIN && b.intVal == -1) {
+                        a.intVal = 0;
+                    } else {
+                        a.intVal %= b.intVal;
+                    }
                 } else {
                     a = a % b;
                 }
@@ -573,35 +580,85 @@ Value VM::run(Chunk* chunk) {
                         runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
                     }
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
-                    *top++ = Value(std::sqrt(val));
+                    *top++ = StandardLibrary::mathSqrt(val);
                 } else if (name == "math.abs") {
                     if (!isLibraryLoaded("math")) {
                         runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
                     }
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
-                    *top++ = Value(std::abs(val));
+                    *top++ = StandardLibrary::mathAbs(val);
                 } else if (name == "math.pow") {
                     if (!isLibraryLoaded("math")) {
                         runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
                     }
                     double exp = (*(--top)).asFloat();
                     double base = (*(--top)).asFloat();
-                    *top++ = Value(std::pow(base, exp));
+                    *top++ = StandardLibrary::mathPow(base, exp);
+                } else if (name == "math.floor") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = StandardLibrary::mathFloor(val);
+                } else if (name == "math.ceil") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = StandardLibrary::mathCeil(val);
+                } else if (name == "math.round") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = StandardLibrary::mathRound(val);
+                } else if (name == "math.min") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double b = (*(--top)).asFloat();
+                    double a = (*(--top)).asFloat();
+                    *top++ = StandardLibrary::mathMin(a, b);
+                } else if (name == "math.max") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double b = (*(--top)).asFloat();
+                    double a = (*(--top)).asFloat();
+                    *top++ = StandardLibrary::mathMax(a, b);
+                } else if (name == "math.random") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    top -= argCount;
+                    *top++ = StandardLibrary::mathRandom();
+                } else if (name == "math.sin") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = StandardLibrary::mathSin(val);
+                } else if (name == "math.cos") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = StandardLibrary::mathCos(val);
+                } else if (name == "math.tan") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
+                    *top++ = StandardLibrary::mathTan(val);
                 } else if (name == "time.sleep") {
                     if (!isLibraryLoaded("time")) {
                         runtimeError("Library 'time' is not loaded. Please use 'use time' or 'import time' first.", curChunk, ip, frameCount);
                     }
                     int64_t ms = argCount > 0 ? (*(--top)).asInt() : 0;
-#ifdef _WIN32
-                    Sleep(static_cast<DWORD>(ms));
-#else
-                    usleep(static_cast<useconds_t>(ms * 1000));
-#endif
-                    *top++ = Value();
+                    *top++ = StandardLibrary::timeSleep(ms);
                 } else if (name == "time.now") {
-                    auto now = std::chrono::system_clock::now().time_since_epoch();
-                    int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-                    *top++ = Value(ms);
+                    top -= argCount;
+                    *top++ = StandardLibrary::timeNow();
                 } else if (name == "get" || name == "net.get" || name == "http.get") {
                     if (argCount == 1) {
                         Value u = *(--top);

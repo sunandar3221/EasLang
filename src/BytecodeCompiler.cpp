@@ -193,7 +193,6 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         emitLoop(loopStart, loopStmt->line);
         patchJump(exitJump);
         currentChunk_->emitOp(OpCode::OP_POP, loopStmt->line);
-        locals_.pop_back();
         return;
     }
 
@@ -390,9 +389,6 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
 
         currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopExpr->line);
         currentChunk_->emitShort(static_cast<uint16_t>(accumSlot), loopExpr->line);
-
-        locals_.pop_back();
-        locals_.pop_back();
         return;
     }
 
@@ -491,6 +487,16 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
             currentChunk_->emitShort(static_cast<uint16_t>(idx), getExpr->line);
             currentChunk_->emit(1, getExpr->line);
         }
+        return;
+    }
+
+    if (auto* sendExpr = dynamic_cast<SendExpr*>(expr)) {
+        compileExpr(sendExpr->target.get());
+        compileExpr(sendExpr->data.get());
+        size_t idx = currentChunk_->addConstant(Value("send"));
+        currentChunk_->emitOp(OpCode::OP_CALL, sendExpr->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(idx), sendExpr->line);
+        currentChunk_->emit(2, sendExpr->line);
         return;
     }
 

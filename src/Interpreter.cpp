@@ -48,6 +48,8 @@ void Interpreter::loadLibrary(const std::string& name) {
         mathObj.setProperty("floor", Value(ValueType::FUNCTION, "math.floor"));
         mathObj.setProperty("ceil", Value(ValueType::FUNCTION, "math.ceil"));
         mathObj.setProperty("round", Value(ValueType::FUNCTION, "math.round"));
+        mathObj.setProperty("min", Value(ValueType::FUNCTION, "math.min"));
+        mathObj.setProperty("max", Value(ValueType::FUNCTION, "math.max"));
         mathObj.setProperty("pow", Value(ValueType::FUNCTION, "math.pow"));
         mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
         globalEnv_->assign("math", mathObj);
@@ -455,7 +457,117 @@ Value Interpreter::evaluate(Expr* expr) {
             return Value();
         }
 
-        if (name == "get") {
+        if (name == "math.sqrt") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathSqrt(val);
+        }
+
+        if (name == "math.abs") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathAbs(val);
+        }
+
+        if (name == "math.pow") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double base = call->arguments.size() >= 1 ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            double exp = call->arguments.size() >= 2 ? evaluate(call->arguments[1].get()).asFloat() : 0.0;
+            return StandardLibrary::mathPow(base, exp);
+        }
+
+        if (name == "math.floor") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathFloor(val);
+        }
+
+        if (name == "math.ceil") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathCeil(val);
+        }
+
+        if (name == "math.round") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathRound(val);
+        }
+
+        if (name == "math.min") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double a = call->arguments.size() >= 1 ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            double b = call->arguments.size() >= 2 ? evaluate(call->arguments[1].get()).asFloat() : 0.0;
+            return StandardLibrary::mathMin(a, b);
+        }
+
+        if (name == "math.max") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double a = call->arguments.size() >= 1 ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            double b = call->arguments.size() >= 2 ? evaluate(call->arguments[1].get()).asFloat() : 0.0;
+            return StandardLibrary::mathMax(a, b);
+        }
+
+        if (name == "math.random") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            return StandardLibrary::mathRandom();
+        }
+
+        if (name == "math.sin") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathSin(val);
+        }
+
+        if (name == "math.cos") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathCos(val);
+        }
+
+        if (name == "math.tan") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            double val = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asFloat() : 0.0;
+            return StandardLibrary::mathTan(val);
+        }
+
+        if (name == "time.sleep") {
+            if (!isLibraryLoaded("time")) {
+                throw std::runtime_error("Library 'time' is not loaded. Please use 'use time' or 'import time' first.");
+            }
+            int64_t ms = !call->arguments.empty() ? evaluate(call->arguments[0].get()).asInt() : 0;
+            return StandardLibrary::timeSleep(ms);
+        }
+
+        if (name == "time.now") {
+            return StandardLibrary::timeNow();
+        }
+
+        if (name == "get" || name == "net.get" || name == "http.get") {
             if (call->arguments.size() == 1) {
                 return StandardLibrary::httpGet(evaluate(call->arguments[0].get()).toString());
             } else if (call->arguments.size() >= 2) {
@@ -466,21 +578,21 @@ Value Interpreter::evaluate(Expr* expr) {
             return Value();
         }
 
-        if (name == "send" && call->arguments.size() >= 2) {
+        if ((name == "send" || name == "net.send" || name == "http.send") && call->arguments.size() >= 2) {
             return StandardLibrary::httpSend(evaluate(call->arguments[0].get()).toString(), evaluate(call->arguments[1].get()).toString());
         }
 
-        if (name == "app" && !call->arguments.empty()) {
+        if ((name == "app" || name == "gui.app") && !call->arguments.empty()) {
             StandardLibrary::setAppTitle(evaluate(call->arguments[0].get()).toString());
             return Value();
         }
 
-        if (name == "window" && call->arguments.size() >= 2) {
+        if ((name == "window" || name == "gui.window") && call->arguments.size() >= 2) {
             StandardLibrary::setWindowSize(static_cast<int>(evaluate(call->arguments[0].get()).asInt()), static_cast<int>(evaluate(call->arguments[1].get()).asInt()));
             return Value();
         }
 
-        if (name == "run") {
+        if (name == "run" || name == "gui.run") {
             int t = call->arguments.empty() ? -1 : static_cast<int>(evaluate(call->arguments[0].get()).asInt());
             return StandardLibrary::runApp(t);
         }

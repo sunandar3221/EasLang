@@ -1,8 +1,87 @@
 #include "AotGenerator.hpp"
+#include "Lexer.hpp"
+#include "Parser.hpp"
+#include "StandardLibrary.hpp"
 #include <fstream>
 #include <cstdlib>
 
-AotGenerator::AotGenerator() : indentLevel_(0) {}
+AotGenerator::AotGenerator() : indentLevel_(0), loopCounter_(0) {}
+
+void AotGenerator::collectVariables(ASTNode* node, std::unordered_set<std::string>& vars) {
+    if (!node) return;
+
+    if (auto* assign = dynamic_cast<AssignStmt*>(node)) {
+        vars.insert(assign->name);
+        collectVariables(assign->value.get(), vars);
+    } else if (auto* block = dynamic_cast<BlockStmt*>(node)) {
+        for (const auto& s : block->statements) {
+            if (!dynamic_cast<FnDeclStmt*>(s.get())) {
+                collectVariables(s.get(), vars);
+            }
+        }
+    } else if (auto* ifStmt = dynamic_cast<IfStmt*>(node)) {
+        collectVariables(ifStmt->condition.get(), vars);
+        collectVariables(ifStmt->thenBranch.get(), vars);
+        collectVariables(ifStmt->elseBranch.get(), vars);
+    } else if (auto* loopStmt = dynamic_cast<LoopStmt*>(node)) {
+        collectVariables(loopStmt->count.get(), vars);
+        collectVariables(loopStmt->body.get(), vars);
+    } else if (auto* whileStmt = dynamic_cast<WhileStmt*>(node)) {
+        collectVariables(whileStmt->condition.get(), vars);
+        collectVariables(whileStmt->body.get(), vars);
+    } else if (auto* ifExpr = dynamic_cast<IfExpr*>(node)) {
+        collectVariables(ifExpr->condition.get(), vars);
+        collectVariables(ifExpr->thenBranch.get(), vars);
+        collectVariables(ifExpr->elseBranch.get(), vars);
+    } else if (auto* loopExpr = dynamic_cast<LoopExpr*>(node)) {
+        collectVariables(loopExpr->count.get(), vars);
+        collectVariables(loopExpr->body.get(), vars);
+    }
+}
+
+void AotGenerator::resolveImports(BlockStmt* program,
+                                  std::vector<std::unique_ptr<FnDeclStmt>>& extraFns,
+                                  std::vector<std::unique_ptr<Stmt>>& extraStmts,
+                                  std::unordered_set<std::string>& visited) {
+    if (!program) return;
+    for (auto& s : program->statements) {
+        if (auto* useStmt = dynamic_cast<UseStmt*>(s.get())) {
+            const std::string& mod = useStmt->moduleName;
+            if (mod.empty() || mod == "io" || mod == "math" || mod == "time" ||
+                mod == "net" || mod == "http" || mod == "gui" || mod == "str" || mod == "string") {
+                continue;
+            }
+            std::string filename = mod;
+            if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
+                filename += ".eas";
+            }
+            if (visited.find(filename) != visited.end()) {
+                continue;
+            }
+            visited.insert(filename);
+
+            Value content = StandardLibrary::readFile(filename);
+            if (!content.strVal.empty()) {
+                Lexer subLex(content.strVal);
+                auto subToks = subLex.tokenize();
+                if (!subLex.hasErrors()) {
+                    Parser subParser(std::move(subToks));
+                    auto subAst = subParser.parseProgram();
+                    if (subAst) {
+                        resolveImports(subAst.get(), extraFns, extraStmts, visited);
+                        for (auto& subStmt : subAst->statements) {
+                            if (dynamic_cast<FnDeclStmt*>(subStmt.get())) {
+                                extraFns.push_back(std::unique_ptr<FnDeclStmt>(static_cast<FnDeclStmt*>(subStmt.release())));
+                            } else {
+                                extraStmts.push_back(std::move(subStmt));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 void AotGenerator::emitIndent(std::ostringstream& ss) {
     for (int i = 0; i < indentLevel_; ++i) {
@@ -80,9 +159,9 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             case TokenType::GREATER_EQUAL:
                 return "(" + generateExpr(bin->left.get()) + " >= " + generateExpr(bin->right.get()) + ")";
             case TokenType::AND:
-                return "((" + generateExpr(bin->left.get()) + ") && (" + generateExpr(bin->right.get()) + "))";
+                return "(static_cast<bool>(Value(" + generateExpr(bin->left.get()) + ")) && static_cast<bool>(Value(" + generateExpr(bin->right.get()) + ")))";
             case TokenType::OR:
-                return "((" + generateExpr(bin->left.get()) + ") || (" + generateExpr(bin->right.get()) + "))";
+                return "(static_cast<bool>(Value(" + generateExpr(bin->left.get()) + ")) || static_cast<bool>(Value(" + generateExpr(bin->right.get()) + ")))";
             default:
                 return "(" + generateExpr(bin->left.get()) + " + " + generateExpr(bin->right.get()) + ")";
         }
@@ -93,7 +172,7 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             return "(-(" + generateExpr(un->right.get()) + "))";
         }
         if (un->op == TokenType::NOT) {
-            return "(!(" + generateExpr(un->right.get()) + "))";
+            return "(!static_cast<bool>(Value(" + generateExpr(un->right.get()) + ")))";
         }
     }
 
@@ -118,25 +197,31 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             p += "})";
             return p;
         }
-        if (callee == "app" && !call->arguments.empty()) {
-            return "([&](){ StandardLibrary::setAppTitle((Value(" + generateExpr(call->arguments[0].get()) + ")).toString()); return Value(); })()";
+        if (callee == "app" || callee == "gui.app") {
+            if (!call->arguments.empty()) {
+                return "([&](){ StandardLibrary::setAppTitle((Value(" + generateExpr(call->arguments[0].get()) + ")).toString()); return Value(); })()";
+            }
         }
-        if (callee == "window" && call->arguments.size() >= 2) {
-            return "([&](){ StandardLibrary::setWindowSize(static_cast<int>(Value(" + generateExpr(call->arguments[0].get()) + ").asInt()), static_cast<int>(Value(" + generateExpr(call->arguments[1].get()) + ").asInt())); return Value(); })()";
+        if (callee == "window" || callee == "gui.window") {
+            if (call->arguments.size() >= 2) {
+                return "([&](){ StandardLibrary::setWindowSize(static_cast<int>(Value(" + generateExpr(call->arguments[0].get()) + ").asInt()), static_cast<int>(Value(" + generateExpr(call->arguments[1].get()) + ").asInt())); return Value(); })()";
+            }
         }
-        if (callee == "run") {
+        if (callee == "run" || callee == "gui.run") {
             std::string dur = call->arguments.empty() ? "-1" : "static_cast<int>(Value(" + generateExpr(call->arguments[0].get()) + ").asInt())";
             return "StandardLibrary::runApp(" + dur + ")";
         }
-        if (callee == "get") {
+        if (callee == "get" || callee == "http.get" || callee == "net.get") {
             if (call->arguments.size() == 1) {
                 return "StandardLibrary::httpGet((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
             } else if (call->arguments.size() >= 2) {
                 return "(Value(" + generateExpr(call->arguments[0].get()) + ")).getProperty((Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
             }
         }
-        if (callee == "send" && call->arguments.size() >= 2) {
-            return "StandardLibrary::httpSend((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
+        if (callee == "send" || callee == "http.send" || callee == "net.send") {
+            if (call->arguments.size() >= 2) {
+                return "StandardLibrary::httpSend((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
+            }
         }
         if (callee == "silent_print") {
             std::string sp = "StandardLibrary::silentPrint(std::vector<Value>{";
@@ -165,6 +250,67 @@ std::string AotGenerator::generateExpr(Expr* expr) {
         }
         if (callee == "float" && !call->arguments.empty()) {
             return "Value((Value(" + generateExpr(call->arguments[0].get()) + ")).asFloat())";
+        }
+
+        // Math functions
+        if (callee == "math.sqrt" || callee == "sqrt") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathSqrt(" + arg + ")";
+        }
+        if (callee == "math.abs" || callee == "abs") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathAbs(" + arg + ")";
+        }
+        if (callee == "math.pow" || callee == "pow") {
+            std::string b = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            std::string e = call->arguments.size() < 2 ? "0.0" : "Value(" + generateExpr(call->arguments[1].get()) + ").asFloat()";
+            return "StandardLibrary::mathPow(" + b + ", " + e + ")";
+        }
+        if (callee == "math.floor" || callee == "floor") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathFloor(" + arg + ")";
+        }
+        if (callee == "math.ceil" || callee == "ceil") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathCeil(" + arg + ")";
+        }
+        if (callee == "math.round" || callee == "round") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathRound(" + arg + ")";
+        }
+        if (callee == "math.min" || callee == "min") {
+            std::string a = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            std::string b = call->arguments.size() < 2 ? "0.0" : "Value(" + generateExpr(call->arguments[1].get()) + ").asFloat()";
+            return "StandardLibrary::mathMin(" + a + ", " + b + ")";
+        }
+        if (callee == "math.max" || callee == "max") {
+            std::string a = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            std::string b = call->arguments.size() < 2 ? "0.0" : "Value(" + generateExpr(call->arguments[1].get()) + ").asFloat()";
+            return "StandardLibrary::mathMax(" + a + ", " + b + ")";
+        }
+        if (callee == "math.random" || callee == "random") {
+            return "StandardLibrary::mathRandom()";
+        }
+        if (callee == "math.sin" || callee == "sin") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathSin(" + arg + ")";
+        }
+        if (callee == "math.cos" || callee == "cos") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathCos(" + arg + ")";
+        }
+        if (callee == "math.tan" || callee == "tan") {
+            std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
+            return "StandardLibrary::mathTan(" + arg + ")";
+        }
+
+        // Time functions
+        if (callee == "time.sleep" || callee == "sleep") {
+            std::string ms = call->arguments.empty() ? "0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asInt()";
+            return "StandardLibrary::timeSleep(" + ms + ")";
+        }
+        if (callee == "time.now" || callee == "now") {
+            return "StandardLibrary::timeNow()";
         }
 
         if ((callee == "lower" || callee == "to_lower" || callee == "lowercase" || callee == "kecil" || callee == "str.lower") && !call->arguments.empty()) {
@@ -209,6 +355,16 @@ std::string AotGenerator::generateExpr(Expr* expr) {
 
     if (auto* getExpr = dynamic_cast<GetExpr*>(expr)) {
         if (getExpr->property) {
+            if (auto* targetVar = dynamic_cast<VarExpr*>(getExpr->target.get())) {
+                if (targetVar->name == "math") {
+                    if (auto* propLit = dynamic_cast<LiteralExpr*>(getExpr->property.get())) {
+                        if (propLit->value.isString()) {
+                            if (propLit->value.strVal == "pi") return "Value(3.141592653589793)";
+                            if (propLit->value.strVal == "e") return "Value(2.718281828459045)";
+                        }
+                    }
+                }
+            }
             return "(Value(" + generateExpr(getExpr->target.get()) + ")).getProperty((Value(" + generateExpr(getExpr->property.get()) + ")).toString())";
         }
         return "StandardLibrary::httpGet((Value(" + generateExpr(getExpr->target.get()) + ")).toString())";
@@ -273,11 +429,13 @@ std::string AotGenerator::generateExpr(Expr* expr) {
     }
 
     if (auto* loopExpr = dynamic_cast<LoopExpr*>(expr)) {
+        std::string cntVar = "_n_" + std::to_string(loopCounter_++);
+        std::string idxVar = "_i_" + std::to_string(loopCounter_++);
         std::string cnt = generateExpr(loopExpr->count.get());
         std::string s = "([&]() -> Value {\n";
-        s += "    int64_t _n = Value(" + cnt + ").asInt();\n";
+        s += "    int64_t " + cntVar + " = Value(" + cnt + ").asInt();\n";
         s += "    std::string _acc = \"\";\n";
-        s += "    for (int64_t _i = 0; _i < _n; ++_i) {\n";
+        s += "    for (int64_t " + idxVar + " = 0; " + idxVar + " < " + cntVar + "; ++" + idxVar + ") {\n";
         for (const auto& st : loopExpr->body->statements) {
             if (auto* ps = dynamic_cast<PrintStmt*>(st.get())) {
                 s += "        _acc += (";
@@ -343,7 +501,7 @@ void AotGenerator::generateReturnStmt(Stmt* stmt, std::ostringstream& ss) {
         emitIndent(ss);
         if (declaredVars_.find(assign->name) == declaredVars_.end()) {
             declaredVars_.insert(assign->name);
-            ss << "auto var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
+            ss << "Value var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
         } else {
             ss << "var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
         }
@@ -393,7 +551,7 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
         emitIndent(ss);
         if (declaredVars_.find(assign->name) == declaredVars_.end()) {
             declaredVars_.insert(assign->name);
-            ss << "auto var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
+            ss << "Value var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
         } else {
             ss << "var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
         }
@@ -488,8 +646,9 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
     }
 
     if (auto* loopStmt = dynamic_cast<LoopStmt*>(stmt)) {
+        std::string idxVar = "_loopIdx_" + std::to_string(loopCounter_++);
         emitIndent(ss);
-        ss << "for (int64_t _loopIdx = 0; _loopIdx < static_cast<int64_t>(" << generateExpr(loopStmt->count.get()) << "); ++_loopIdx) {\n";
+        ss << "for (int64_t " << idxVar << " = 0; " << idxVar << " < static_cast<int64_t>(Value(" << generateExpr(loopStmt->count.get()) << ").asInt()); ++" << idxVar << ") {\n";
         indentLevel_++;
         generateBlock(loopStmt->body.get(), ss);
         indentLevel_--;
@@ -510,11 +669,19 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
     }
 
     if (auto* useStmt = dynamic_cast<UseStmt*>(stmt)) {
+        (void)useStmt;
         return;
     }
 }
 
 std::string AotGenerator::generateCpp(BlockStmt* program) {
+    loopCounter_ = 0;
+    std::vector<std::unique_ptr<FnDeclStmt>> extraFns;
+    std::vector<std::unique_ptr<Stmt>> extraStmts;
+    std::unordered_set<std::string> visitedImports;
+
+    resolveImports(program, extraFns, extraStmts, visitedImports);
+
     std::ostringstream ss;
     ss << "#include \"Value.hpp\"\n";
     ss << "#include \"StandardLibrary.hpp\"\n";
@@ -523,27 +690,93 @@ std::string AotGenerator::generateCpp(BlockStmt* program) {
     ss << "#include <string>\n";
     ss << "#include <cstdint>\n\n";
 
+    auto emitFnProto = [&](FnDeclStmt* fn) {
+        ss << "Value fn_" << fn->name << "(";
+        for (size_t i = 0; i < fn->params.size(); ++i) {
+            if (i > 0) ss << ", ";
+            ss << "Value var_" << fn->params[i];
+        }
+        ss << ");\n";
+    };
+
+    for (const auto& fn : extraFns) {
+        emitFnProto(fn.get());
+    }
     for (const auto& stmt : program->statements) {
         if (auto* fn = dynamic_cast<FnDeclStmt*>(stmt.get())) {
-            declaredVars_.clear();
-            for (const auto& p : fn->params) {
-                declaredVars_.insert(p);
+            emitFnProto(fn);
+        }
+    }
+    ss << "\n";
+
+    auto emitFnDef = [&](FnDeclStmt* fn) {
+        declaredVars_.clear();
+        for (const auto& p : fn->params) {
+            declaredVars_.insert(p);
+        }
+
+        std::unordered_set<std::string> fnVars;
+        collectVariables(fn->body.get(), fnVars);
+        for (const auto& v : fnVars) {
+            declaredVars_.insert(v);
+        }
+
+        ss << "Value fn_" << fn->name << "(";
+        for (size_t i = 0; i < fn->params.size(); ++i) {
+            if (i > 0) ss << ", ";
+            ss << "Value var_" << fn->params[i];
+        }
+        ss << ") {\n";
+        indentLevel_ = 1;
+
+        std::unordered_set<std::string> paramSet(fn->params.begin(), fn->params.end());
+        for (const auto& v : fnVars) {
+            if (paramSet.find(v) == paramSet.end()) {
+                emitIndent(ss);
+                ss << "Value var_" << v << ";\n";
             }
-            ss << "auto fn_" << fn->name << "(";
-            for (size_t i = 0; i < fn->params.size(); ++i) {
-                if (i > 0) ss << ", ";
-                ss << "auto var_" << fn->params[i];
-            }
-            ss << ") {\n";
-            indentLevel_ = 1;
-            generateBlock(fn->body.get(), ss, true);
-            ss << "}\n\n";
+        }
+
+        generateBlock(fn->body.get(), ss, true);
+        ss << "}\n\n";
+    };
+
+    for (const auto& fn : extraFns) {
+        emitFnDef(fn.get());
+    }
+    for (const auto& stmt : program->statements) {
+        if (auto* fn = dynamic_cast<FnDeclStmt*>(stmt.get())) {
+            emitFnDef(fn);
         }
     }
 
     declaredVars_.clear();
+    std::unordered_set<std::string> mainVars;
+    for (const auto& s : extraStmts) {
+        collectVariables(s.get(), mainVars);
+    }
+    for (const auto& s : program->statements) {
+        if (!dynamic_cast<FnDeclStmt*>(s.get())) {
+            collectVariables(s.get(), mainVars);
+        }
+    }
+    for (const auto& v : mainVars) {
+        declaredVars_.insert(v);
+    }
+
     indentLevel_ = 1;
     ss << "int main(int argc, char** argv) {\n";
+    ss << "    (void)argc;\n";
+    ss << "    (void)argv;\n";
+
+    for (const auto& v : mainVars) {
+        emitIndent(ss);
+        ss << "Value var_" << v << ";\n";
+    }
+
+    for (const auto& stmt : extraStmts) {
+        generateStmt(stmt.get(), ss);
+    }
 
     for (const auto& stmt : program->statements) {
         if (!dynamic_cast<FnDeclStmt*>(stmt.get())) {

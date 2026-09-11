@@ -3,6 +3,11 @@
 #include <fstream>
 #include <sstream>
 #include <cctype>
+#include <cmath>
+#include <chrono>
+#include <ctime>
+#include <cstdlib>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -195,7 +200,7 @@ Value StandardLibrary::runApp(int timeoutMs) {
     }
 
     HINSTANCE hInst = GetModuleHandleA(NULL);
-    WNDCLASSEXA wc = {0};
+    WNDCLASSEXA wc{};
     wc.cbSize = sizeof(WNDCLASSEXA);
     wc.lpfnWndProc = EasWindowProc;
     wc.hInstance = hInst;
@@ -295,3 +300,72 @@ Value StandardLibrary::incaseSensitive(const std::string& a, const std::string& 
     }
     return Value(true);
 }
+
+Value StandardLibrary::mathSqrt(double val) {
+    return Value(std::sqrt(val));
+}
+
+Value StandardLibrary::mathAbs(double val) {
+    return Value(std::abs(val));
+}
+
+Value StandardLibrary::mathPow(double base, double exp) {
+    return Value(std::pow(base, exp));
+}
+
+Value StandardLibrary::mathFloor(double val) {
+    return Value(std::floor(val));
+}
+
+Value StandardLibrary::mathCeil(double val) {
+    return Value(std::ceil(val));
+}
+
+Value StandardLibrary::mathRound(double val) {
+    return Value(std::round(val));
+}
+
+Value StandardLibrary::mathMin(double a, double b) {
+    return Value(std::min(a, b));
+}
+
+Value StandardLibrary::mathMax(double a, double b) {
+    return Value(std::max(a, b));
+}
+
+Value StandardLibrary::mathRandom() {
+    static bool seeded = false;
+    if (!seeded) {
+        std::srand(static_cast<unsigned int>(std::time(nullptr)));
+        seeded = true;
+    }
+    return Value(static_cast<double>(std::rand()) / (static_cast<double>(RAND_MAX) + 1.0));
+}
+
+Value StandardLibrary::mathSin(double val) {
+    return Value(std::sin(val));
+}
+
+Value StandardLibrary::mathCos(double val) {
+    return Value(std::cos(val));
+}
+
+Value StandardLibrary::mathTan(double val) {
+    return Value(std::tan(val));
+}
+
+Value StandardLibrary::timeSleep(int64_t ms) {
+#ifdef _WIN32
+    Sleep(static_cast<DWORD>(ms));
+#else
+    usleep(static_cast<useconds_t>(ms * 1000));
+#endif
+    return Value();
+}
+
+Value StandardLibrary::timeNow() {
+    auto now = std::chrono::system_clock::now().time_since_epoch();
+    int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    return Value(ms);
+}
+
