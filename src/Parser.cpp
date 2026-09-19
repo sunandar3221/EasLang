@@ -852,7 +852,7 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
     }
 
     if (match(TokenType::STRING)) {
-        return std::make_unique<LiteralExpr>(Value(previous().lexeme), line);
+        return parseStringInterpolation(previous());
     }
 
     if (match(TokenType::TRUE)) {
@@ -925,4 +925,130 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
         advance();
     }
     return std::make_unique<LiteralExpr>(Value(), line);
+}
+
+std::unique_ptr<Expr> Parser::parseStringInterpolation(const Token& strTok) {
+    const std::string& text = strTok.lexeme;
+    if (text.find('$') == std::string::npos) {
+        return std::make_unique<LiteralExpr>(Value(text), strTok.line, strTok.column);
+    }
+
+    std::vector<std::unique_ptr<Expr>> parts;
+    std::string currentLit;
+    size_t i = 0;
+    while (i < text.size()) {
+        if (text[i] == '\\' && i + 1 < text.size() && text[i + 1] == '$') {
+            currentLit += '$';
+            i += 2;
+        } else if (text[i] == '$' && i + 1 < text.size() && text[i + 1] == '{') {
+            size_t startExpr = i + 2;
+            int depth = 1;
+            size_t j = startExpr;
+            bool inSubStr = false;
+            while (j < text.size() && depth > 0) {
+                if (text[j] == '"' && (j == 0 || text[j - 1] != '\\')) {
+                    inSubStr = !inSubStr;
+                } else if (!inSubStr) {
+                    if (text[j] == '{') depth++;
+                    else if (text[j] == '}') depth--;
+                }
+                if (depth == 0) break;
+                j++;
+            }
+
+            if (depth == 0) {
+                if (!currentLit.empty()) {
+                    parts.push_back(std::make_unique<LiteralExpr>(Value(currentLit), strTok.line, strTok.column));
+                    currentLit.clear();
+                }
+
+                std::string exprStr = text.substr(startExpr, j - startExpr);
+                Lexer subLexer(exprStr);
+                auto subTokens = subLexer.tokenize();
+                if (!subLexer.hasErrors() && !subTokens.empty()) {
+                    Parser subParser(std::move(subTokens));
+                    subParser.setFunctionArity(functionArity_);
+                    auto parsed = subParser.parseExpression();
+                    if (parsed) {
+                        parts.push_back(std::move(parsed));
+                    } else {
+                        parts.push_back(std::make_unique<LiteralExpr>(Value("${" + exprStr + "}"), strTok.line, strTok.column));
+                    }
+                } else {
+                    parts.push_back(std::make_unique<LiteralExpr>(Value("${" + exprStr + "}"), strTok.line, strTok.column));
+                }
+                i = j + 1;
+            } else {
+                currentLit += "${";
+                i += 2;
+            }
+        } else if (text[i] == '$' && i + 1 < text.size() && (std::isalpha(static_cast<unsigned char>(text[i + 1])) || text[i + 1] == '_')) {
+            size_t startId = i + 1;
+            size_t j = startId;
+            while (j < text.size() && (std::isalnum(static_cast<unsigned char>(text[j])) || text[j] == '_')) {
+                j++;
+            }
+            if (!currentLit.empty()) {
+                parts.push_back(std::make_unique<LiteralExpr>(Value(currentLit), strTok.line, strTok.column));
+                currentLit.clear();
+            }
+            std::string varName = text.substr(startId, j - startId);
+            parts.push_back(std::make_unique<VarExpr>(varName, strTok.line, strTok.column));
+            i = j;
+        } else {
+            currentLit += text[i];
+            i++;
+        }
+    }
+
+    if (!currentLit.empty()) {
+        parts.push_back(std::make_unique<LiteralExpr>(Value(currentLit), strTok.line, strTok.column));
+    }
+
+    if (parts.empty()) {
+        return std::make_unique<LiteralExpr>(Value(""), strTok.line, strTok.column);
+    }
+
+    if (parts.size() == 1) {
+        if (auto* lit = dynamic_cast<LiteralExpr*>(parts[0].get())) {
+            if (lit->value.isString()) {
+                return std::move(parts[0]);
+            }
+        }
+        return std::make_unique<BinaryExpr>(
+            std::make_unique<LiteralExpr>(Value(""), strTok.line, strTok.column),
+            TokenType::PLUS,
+            std::move(parts[0]),
+            strTok.line, strTok.column
+        );
+    }
+
+    std::unique_ptr<Expr> result;
+    size_t startIdx = 0;
+
+    bool firstIsString = false;
+    if (auto* lit = dynamic_cast<LiteralExpr*>(parts[0].get())) {
+        if (lit->value.isString()) {
+            firstIsString = true;
+        }
+    }
+
+    if (firstIsString) {
+        result = std::move(parts[0]);
+        startIdx = 1;
+    } else {
+        result = std::make_unique<LiteralExpr>(Value(""), strTok.line, strTok.column);
+        startIdx = 0;
+    }
+
+    for (size_t k = startIdx; k < parts.size(); ++k) {
+        result = std::make_unique<BinaryExpr>(
+            std::move(result),
+            TokenType::PLUS,
+            std::move(parts[k]),
+            strTok.line, strTok.column
+        );
+    }
+
+    return result;
 }

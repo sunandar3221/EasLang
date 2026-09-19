@@ -59,4 +59,8 @@ private:
     std::unique_ptr<Expr> parsePrimary();
     std::unique_ptr<Expr> parseCallOrPrimary();
     std::unique_ptr<Expr> parsePostfix(std::unique_ptr<Expr> expr);
+    std::unique_ptr<Expr> parseStringInterpolation(const Token& strTok);
+
+public:
+    void setFunctionArity(const std::unordered_map<std::string, int>& arity) { functionArity_ = arity; }
 };

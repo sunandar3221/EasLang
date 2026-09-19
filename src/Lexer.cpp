@@ -146,6 +146,10 @@ Token Lexer::readString() {
                 else if (esc == 'r') val += '\r';
                 else if (esc == '"') val += '"';
                 else if (esc == '\\') val += '\\';
+                else if (esc == '$') {
+                    val += '\\';
+                    val += '$';
+                }
                 else val += esc;
             }
         } else {

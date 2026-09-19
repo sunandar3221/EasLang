@@ -95,7 +95,7 @@ EasLang dapat berjalan secara native dan berkecepatan penuh di smartphone Androi
 5. **Coba Jalankan Skrip Pertama di Android**:
    ```bash
    echo 'nama = "Android Termux"' > coba.eas
-   echo 'print "EasLang berjalan mulus di " + nama' >> coba.eas
+   echo 'print "EasLang berjalan mulus di ${nama}"' >> coba.eas
    eas coba.eas
    ```
 
@@ -147,8 +147,8 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code EasL
 
 ## 3. Kursus Kilat EasLang (Crash Course)
 
-### Bab 1: Output, Variabel Dinamis & Komentar
-Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan `print` mendukung multi-argumen dengan spasi pemisah, penggabungan string, maupun pemanggilan dengan tanda kurung. Komentar dapat ditulis menggunakan `#` (gaya Python/Ruby) maupun `//` (gaya C/JavaScript):
+### Bab 1: Output, Variabel Dinamis, String Interpolation & Komentar
+Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan variabel di dalam string dapat ditulis langsung menggunakan **String Interpolation** (`${variabel}` atau `$variabel`), multi-argumen dengan spasi pemisah, maupun penggabungan string (`+`). Komentar dapat ditulis menggunakan `#` (gaya Python/Ruby) maupun `//` (gaya C/JavaScript):
 
 ```eas
 # Ini adalah komentar satu baris gaya Python
@@ -157,12 +157,24 @@ Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa tit
 name = "Budi"
 age = 20  # Variabel dinamis otomatis terdefinisi
 
+# 1. String Interpolation (${variabel} atau $variabel)
+print "halo ${name}, umur kamu ${age}"
+print "Nama: $name, Umur: $age tahun"
+
+# 2. String Interpolation dengan Ekspresi Matematis / Fungsi
+print "Tahun depan umur kamu: ${age + 1}"
+
+# 3. Pemanggilan Standar & Multi-argumen
 print name
 print age
 print "Halo nama saya " + name
 print "Nama:", name, "Umur:", age
 print("Halo Dunia")
 ```
+
+> ⚡ **Performa Maksimal (Zero Runtime Overhead)**:
+> String interpolation di EasLang diubah otomatis pada tahap parsing (*compile-time desugaring*) menjadi native concatenation. Ini membuat eksekusi string interpolation di Virtual Machine maupun biner native AOT berjalan dengan **kecepatan penuh tanpa latensi parsing di runtime**!
+
 
 ### Bab 2: Operasi Aritmatika & Ekspresi
 EasLang mendukung operator standar `+`, `-`, `*`, `/`, `%` dengan prioritas matematis yang benar serta pengelompokan menggunakan tanda kurung `()`:
@@ -320,7 +332,7 @@ nama = io.input("Siapa nama kamu? ")
 umur = input "Berapa umur kamu? "
 hobi = io.ask("Apa hobi kamu? ")
 
-io.print "Halo " + nama + ", umur " + umur + ", hobi " + hobi
+io.print "Halo ${nama}, umur ${umur}, hobi ${hobi}"
 
 io.write "catatan.txt", "Belajar EasLang sangat menyenangkan"
 isi = io.read "catatan.txt"
@@ -439,14 +451,14 @@ use io
 import "kalkulator"
 
 hasilTambah = tambah 15 25
-io.print "15 + 25 = " + str(hasilTambah)
+io.print "15 + 25 = ${hasilTambah}"
 
 hasilKali = kali(6, 7)
-io.print "6 * 7 = " + str(hasilKali)
+io.print "6 * 7 = ${hasilKali}"
 
 r = 10
 luas = luas_lingkaran r
-io.print "Luas lingkaran (r=10): " + str(luas)
+io.print "Luas lingkaran (r=10): ${luas}"
 ```
 
 ##### Berbagai Format Penulisan Impor yang Didukung:
@@ -474,7 +486,7 @@ EasLang menyediakan fungsi bawaan global tingkat sistem yang dapat digunakan lan
 teks = "123"
 angka = int(teks)
 desimal = float("3.1415")
-hasilGabung = "Nilai: " + str(angka)
+hasilGabung = "Nilai: ${angka}"  # atau "Nilai: " + str(angka)
 print hasilGabung
 ```
 
