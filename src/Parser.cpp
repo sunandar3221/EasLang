@@ -28,6 +28,11 @@ Parser::Parser(std::vector<Token> tokens)
     functionArity_["math.max"] = 2;
     functionArity_["math.random"] = 0;
     functionArity_["random"] = 0;
+    functionArity_["math.random_seed"] = 1;
+    functionArity_["math.randomSeed"] = 1;
+    functionArity_["math.seed"] = 1;
+    functionArity_["random_seed"] = 1;
+    functionArity_["seed"] = 1;
     functionArity_["math.sin"] = 1;
     functionArity_["math.cos"] = 1;
     functionArity_["math.tan"] = 1;

@@ -299,6 +299,13 @@ std::string AotGenerator::generateExpr(Expr* expr) {
                 return "StandardLibrary::mathRandom(Value(" + generateExpr(call->arguments[0].get()) + ").asFloat(), Value(" + generateExpr(call->arguments[1].get()) + ").asFloat())";
             }
         }
+        if (callee == "math.random_seed" || callee == "math.randomSeed" || callee == "math.seed" || callee == "random_seed" || callee == "seed") {
+            if (call->arguments.empty()) {
+                return "StandardLibrary::mathRandomSeed()";
+            } else {
+                return "StandardLibrary::mathRandomSeed(Value(" + generateExpr(call->arguments[0].get()) + ").asInt())";
+            }
+        }
         if (callee == "math.sin" || callee == "sin") {
             std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
             return "StandardLibrary::mathSin(" + arg + ")";

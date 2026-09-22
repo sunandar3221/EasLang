@@ -60,8 +60,13 @@ void Interpreter::loadLibrary(const std::string& name) {
         mathObj.setProperty("max", Value(ValueType::FUNCTION, "math.max"));
         mathObj.setProperty("pow", Value(ValueType::FUNCTION, "math.pow"));
         mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
+        mathObj.setProperty("random_seed", Value(ValueType::FUNCTION, "math.random_seed"));
+        mathObj.setProperty("randomSeed", Value(ValueType::FUNCTION, "math.random_seed"));
+        mathObj.setProperty("seed", Value(ValueType::FUNCTION, "math.random_seed"));
         globalEnv_->assign("math", mathObj);
         globalEnv_->assign("random", Value(ValueType::FUNCTION, "math.random"));
+        globalEnv_->assign("random_seed", Value(ValueType::FUNCTION, "math.random_seed"));
+        globalEnv_->assign("seed", Value(ValueType::FUNCTION, "math.random_seed"));
     } else if (name == "time") {
         Value timeObj = Value::makeObject();
         timeObj.setProperty("now", Value(ValueType::FUNCTION, "time.now"));
@@ -579,6 +584,17 @@ Value Interpreter::evaluate(Expr* expr) {
                 double a = evaluate(call->arguments[0].get()).asFloat();
                 double b = evaluate(call->arguments[1].get()).asFloat();
                 return StandardLibrary::mathRandom(a, b);
+            }
+        }
+
+        if (name == "math.random_seed" || name == "math.randomSeed" || name == "math.seed" || name == "random_seed" || name == "seed") {
+            if (!isLibraryLoaded("math")) {
+                throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
+            }
+            if (call->arguments.empty()) {
+                return StandardLibrary::mathRandomSeed();
+            } else {
+                return StandardLibrary::mathRandomSeed(evaluate(call->arguments[0].get()).asInt());
             }
         }
 

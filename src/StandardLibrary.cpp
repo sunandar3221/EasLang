@@ -377,6 +377,28 @@ Value StandardLibrary::mathRandom(const std::vector<Value>& args) {
     return mathRandom(args[0].asFloat(), args[1].asFloat());
 }
 
+Value StandardLibrary::mathRandomSeed(int64_t seed) {
+    getRandomEngine().seed(static_cast<uint64_t>(seed));
+    std::srand(static_cast<unsigned int>(seed));
+    return Value(seed);
+}
+
+Value StandardLibrary::mathRandomSeed() {
+    uint64_t s1 = std::random_device{}();
+    uint64_t s2 = static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    uint64_t seed = s1 ^ (s2 + 0x9e3779b97f4a7c15ULL + (s1 << 6) + (s1 >> 2));
+    getRandomEngine().seed(seed);
+    std::srand(static_cast<unsigned int>(seed));
+    return Value(static_cast<int64_t>(seed));
+}
+
+Value StandardLibrary::mathRandomSeed(const std::vector<Value>& args) {
+    if (args.empty() || args[0].isNil()) {
+        return mathRandomSeed();
+    }
+    return mathRandomSeed(args[0].asInt());
+}
+
 Value StandardLibrary::mathSin(double val) {
     return Value(std::sin(val));
 }

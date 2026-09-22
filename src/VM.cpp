@@ -53,10 +53,15 @@ void VM::loadLibrary(const std::string& name) {
         mathObj.setProperty("cos", Value(ValueType::FUNCTION, "math.cos"));
         mathObj.setProperty("tan", Value(ValueType::FUNCTION, "math.tan"));
         mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
+        mathObj.setProperty("random_seed", Value(ValueType::FUNCTION, "math.random_seed"));
+        mathObj.setProperty("randomSeed", Value(ValueType::FUNCTION, "math.random_seed"));
+        mathObj.setProperty("seed", Value(ValueType::FUNCTION, "math.random_seed"));
         mathObj.setProperty("pi", Value(3.14159265358979323846));
         mathObj.setProperty("e", Value(2.71828182845904523536));
         globals_["math"] = mathObj;
         globals_["random"] = Value(ValueType::FUNCTION, "math.random");
+        globals_["random_seed"] = Value(ValueType::FUNCTION, "math.random_seed");
+        globals_["seed"] = Value(ValueType::FUNCTION, "math.random_seed");
     } else if (name == "time") {
         Value timeObj = Value::makeObject();
         timeObj.setProperty("sleep", Value(ValueType::FUNCTION, "time.sleep"));
@@ -642,6 +647,17 @@ Value VM::run(Chunk* chunk) {
                         double a = (*(--top)).asFloat();
                         top -= (argCount - 2);
                         *top++ = StandardLibrary::mathRandom(a, b);
+                    }
+                } else if (name == "math.random_seed" || name == "math.randomSeed" || name == "math.seed" || name == "random_seed" || name == "seed") {
+                    if (!isLibraryLoaded("math")) {
+                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                    }
+                    if (argCount == 0) {
+                        *top++ = StandardLibrary::mathRandomSeed();
+                    } else {
+                        int64_t s = (*(--top)).asInt();
+                        top -= (argCount - 1);
+                        *top++ = StandardLibrary::mathRandomSeed(s);
                     }
                 } else if (name == "math.sin") {
                     if (!isLibraryLoaded("math")) {

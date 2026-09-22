@@ -35,6 +35,9 @@ public:
     static Value mathRandom(double max);
     static Value mathRandom(double min, double max);
     static Value mathRandom(const std::vector<Value>& args);
+    static Value mathRandomSeed(int64_t seed);
+    static Value mathRandomSeed();
+    static Value mathRandomSeed(const std::vector<Value>& args);
     static Value mathSin(double val);
     static Value mathCos(double val);
     static Value mathTan(double val);
