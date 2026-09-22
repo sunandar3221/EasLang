@@ -215,16 +215,22 @@ print "Dihapus: " + terakhir  # Output: Mangga
 print len(buah)          # Output: 2
 ```
 
-### Bab 4: Percabangan (`if` - `else`), If Expression, & Pencocokan Teks
-Percabangan menggunakan kata kunci `if` dan `else` berbasis indentasi bersih tanpa kurung kurawal atau titik dua. Keyword `end` dapat digunakan secara opsional.
+### Bab 4: Percabangan (`if` - `elseif` / `elif` - `else`), If Expression, & Pencocokan Teks
+Percabangan menggunakan kata kunci `if`, `elseif` (atau `elif`), dan `else` berbasis indentasi bersih tanpa kurung kurawal atau titik dua. Keyword `end` dapat digunakan secara opsional.
 
-#### 1. Percabangan Standar
+#### 1. Percabangan Bersarang & Multikondisi (`elseif` / `elif`)
+Anda dapat menggunakan `elseif` maupun `elif` untuk mengecek banyak kondisi secara berurutan:
 ```eas
-age = 20
-if age >= 18
-    print "Adult"
+nilai = 85
+
+if nilai >= 90
+    print "Grade A"
+elseif nilai >= 80
+    print "Grade B"
+elif nilai >= 70
+    print "Grade C"
 else
-    print "Minor"
+    print "Grade D"
 ```
 
 #### 2. If Expression (Menugaskan Nilai Percabangan ke Variabel)
@@ -265,18 +271,26 @@ print lower("Halo Dunia")  # Output: halo dunia
 print upper("halo dunia")  # Output: HALO DUNIA
 ```
 
-### Bab 5: Perulangan (`loop` & `while`)
+### Bab 5: Perulangan (`loop` & `while`), `break`, dan `continue`
 - Gunakan `loop <jumlah>` untuk mengulang blok sebanyak $n$ kali secara terhitung.
 - Gunakan `while <kondisi>` untuk perulangan berbasis evaluasi kondisi.
+- Gunakan `break` untuk keluar dari loop seketika.
+- Gunakan `continue` untuk melompati sisa iterasi saat ini dan lanjut ke iterasi berikutnya.
 
 ```eas
+# Perulangan loop terhitung
 loop 3
     print "Pengulangan loop"
 
-counter = 5
-while counter > 0
-    print counter
-    counter = counter - 1
+# Perulangan while dengan break dan continue
+i = 0
+while true
+    i = i + 1
+    if i == 3
+        continue  # Lewati angka 3
+    if i > 5
+        break     # Keluar saat i melebihi 5
+    print "Angka: ${i}"
 ```
 
 #### Loop Assignment & `silent_print`
@@ -291,22 +305,28 @@ halo = loop 3000
 write "hai.txt" halo
 ```
 
-### Bab 6: Fungsi, First-Class Functions, & Implicit Return (`fn`)
-Fungsi dideklarasikan dengan kata kunci `fn`, diikuti nama fungsi dan parameter yang dipisahkan spasi.
-- **Implicit Return**: Baris atau ekspresi terakhir dalam fungsi otomatis menjadi nilai baliknya tanpa perlu keyword `return`.
+### Bab 6: Fungsi, Explicit & Implicit Return, serta Kata Kunci Alternatif (`fn`, `def`, `func`)
+Fungsi dapat dideklarasikan dengan `fn`, `def`, `func`, maupun `function`, diikuti nama fungsi dan parameter yang dipisahkan spasi.
+- **Implicit & Explicit Return**: Baris terakhir otomatis menjadi nilai balik fungsi, ATAU Anda dapat menggunakan kata kunci `return` untuk mengembalikan nilai secara eksplisit / keluar lebih awal (*early exit*).
 - **Fleksibilitas Pemanggilan**: Fungsi dapat dipanggil dengan gaya perintah `add 10 20` maupun gaya kurung `add(10, 20)`.
 
 ```eas
+# Menggunakan kata kunci 'fn' dengan implicit return
 fn add a b
     a + b
 
 print add 10 20
 print add(10, 20)
 
-fn multiply x y
-    x * y
+# Menggunakan 'def' / 'func' dengan 'return' eksplisit
+def cekStatus umur
+    if umur < 0
+        return "Tidak valid"
+    elseif umur < 18
+        return "Minor"
+    return "Adult"
 
-print multiply 6 7
+print cekStatus(20) # Output: Adult
 ```
 
 #### Memasukkan Fungsi ke Variabel (First-Class Functions)
@@ -533,12 +553,15 @@ print case_sensitive(user1, user2)    # Output: false
 | `print` | Output | Menampilkan satu atau beberapa nilai ke konsol standar dengan spasi pemisah dan diakhiri baris baru | `print "Halo" 123` |
 | `silent_print` | Output | Memformat teks seperti `print` tanpa mencetak ke konsol terminal (menampung output untuk loop assignment) | `silent_print "Data"` |
 | `if` | Logika | Memulai blok percabangan kondisional berbasis indentasi bersih | `if score > 75` |
-| `else` | Logika | Blok alternatif jika kondisi `if` sebelumnya bernilai salah | `else` |
+| `elseif` / `elif` | Logika | Percabangan alternatif multikondisi jika kondisi sebelumnya tidak terpenuhi | `elseif score >= 60` |
+| `else` | Logika | Blok alternatif jika seluruh kondisi `if` / `elseif` sebelumnya salah | `else` |
 | `loop` | Iterasi | Mengulang eksekusi blok sebanyak $n$ kali secara terhitung | `loop 10` |
 | `while` | Iterasi | Mengulang eksekusi blok selama ekspresi kondisional bernilai benar | `while x > 0` |
-| `fn` | Fungsi | Mendeklarasikan fungsi baru dengan implicit return pada ekspresi terakhir (mendukung lambda) | `fn calc a b` atau `f = fn x` |
-| `use` | Modul | Mengimpor berkas modul `.eas` eksternal atau pustaka bawaan | `use io` atau `use "helper"` |
-| `import` | Modul | Sinonim modern dari `use` untuk memuat modul atau library standar | `import io` atau `import math` |
+| `break` | Kontrol Loop | Menghentikan eksekusi perulangan (`while` atau `loop`) dan keluar seketika | `break` |
+| `continue` | Kontrol Loop | Melompati sisa baris iterasi saat ini dan langsung ke iterasi loop berikutnya | `continue` |
+| `return` | Fungsi | Mengembalikan nilai dari fungsi secara eksplisit / keluar lebih awal | `return hasil` |
+| `fn` / `def` / `func` | Fungsi | Mendeklarasikan fungsi baru (mendukung implicit dan explicit return) | `def calc a b` atau `fn x` |
+| `use` / `import` | Modul | Mengimpor berkas modul `.eas` eksternal atau pustaka bawaan (didukung juga `include` / `require`) | `use io` atau `import math` |
 | `new` | Objek | Menginstansiasi objek map/state baru di memori | `user = new` |
 | `get` | Objek / HTTP | Mengambil properti objek (`get obj "key"`) atau melakukan HTTP GET (`get "url"`) | `get user "name"` |
 | `set` | Objek | Menetapkan nilai properti pada objek/map (`set obj "key" val`) | `set user "age" 25` |
@@ -549,9 +572,9 @@ print case_sensitive(user1, user2)    # Output: false
 | `window` | Desktop GUI | Mengatur lebar dan tinggi jendela GUI desktop native (`use gui`) | `window 1024 768` |
 | `run` | Desktop GUI | Memulai message pump dan lifecycle aplikasi desktop native (`use gui`) | `run` atau `run 1000` |
 | `end` | Struktur | Keyword penutup blok opsional bagi pengguna yang ingin penutup eksplisit | `end` |
-| `true` | Nilai | Literal boolean benar | `isAktif = true` |
-| `false` | Nilai | Literal boolean salah | `isAktif = false` |
-| `nil` / `null` | Nilai | Literal nilai kosong / ketiadaan nilai | `data = nil` |
+| `true` / `True` | Nilai | Literal boolean benar | `isAktif = true` |
+| `false` / `False` | Nilai | Literal boolean salah | `isAktif = false` |
+| `nil` / `null` / `None` | Nilai | Literal nilai kosong / ketiadaan nilai | `data = nil` |
 
 ### 4.2 Kamus Fungsi Bawaan Global (Built-in Functions)
 
@@ -577,7 +600,7 @@ Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use
 | Pustaka | Cara Memuat | Fitur & Fungsi Utama | Keterangan |
 | :--- | :--- | :--- | :--- |
 | **`io`** | `use io` atau `import io` | `io.input`, `io.ask`, `io.print`, `io.read`, `io.write` | Wajib dimuat untuk operasi berkas dan input keyboard pengguna |
-| **`math`** | `use math` atau `import math` | `math.sqrt`, `math.pow`, `math.abs`, `math.floor`, `math.ceil`, `math.round`, `math.min`, `math.max`, `math.random`, `math.pi` | Perhitungan dan fungsi matematis presisi tinggi |
+| **`math`** | `use math` atau `import math` | `math.sqrt`, `math.pow`, `math.abs`, `math.floor`, `math.ceil`, `math.round`, `math.min`, `math.max`, `math.random`, `math.pi` | Perhitungan dan fungsi matematis. `math.random(1, 100)` menghasilkan angka integer acak dalam rentang tertentu inklusif. |
 | **`time`** | `use time` atau `import time` | `time.now`, `time.sleep` | Pengukuran waktu (milidetik) dan jeda eksekusi program |
 | **`net`** / **`http`** | `use net` atau `import net` | `net.get`, `net.send`, `http.get`, `http.send` | Komunikasi jaringan dan request HTTP |
 | **`gui`** | `use gui` atau `import gui` | `gui.app`, `gui.window`, `gui.run` | Aplikasi GUI jendela desktop native Win32 |
@@ -598,7 +621,7 @@ Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use
 | `%` | Modulo | Menghitung sisa hasil bagi | `10 % 3` |
 | `==`, `!=` | Kesetaraan | Memeriksa kesamaan atau perbedaan dua nilai | `a == b`, `x != y` |
 | `<`, `>`, `<=`, `>=` | Relasional | Membandingkan besar-kecil nilai | `score >= 75` |
-| `and`, `or`, `not` | Logika Boolean | Operator logika AND, OR, dan NOT | `if a and not b` |
+| `and`, `or`, `not`, `&&`, `\|\|`, `!` | Logika Boolean | Operator logika AND, OR, dan NOT (kata atau simbol) | `if a and not b`, `x && !y` |
 | `[]` | Indexer / Array Literal | Membuat list literal atau mengakses elemen via indeks | `arr = [1, 2]`, `arr[0]` |
 | `()` | Prioritas / Panggilan | Mengatur prioritas ekspresi atau memanggil fungsi | `(a + b) * c`, `add(1, 2)` |
 

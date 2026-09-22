@@ -52,9 +52,11 @@ void VM::loadLibrary(const std::string& name) {
         mathObj.setProperty("sin", Value(ValueType::FUNCTION, "math.sin"));
         mathObj.setProperty("cos", Value(ValueType::FUNCTION, "math.cos"));
         mathObj.setProperty("tan", Value(ValueType::FUNCTION, "math.tan"));
+        mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
         mathObj.setProperty("pi", Value(3.14159265358979323846));
         mathObj.setProperty("e", Value(2.71828182845904523536));
         globals_["math"] = mathObj;
+        globals_["random"] = Value(ValueType::FUNCTION, "math.random");
     } else if (name == "time") {
         Value timeObj = Value::makeObject();
         timeObj.setProperty("sleep", Value(ValueType::FUNCTION, "time.sleep"));
@@ -626,12 +628,21 @@ Value VM::run(Chunk* chunk) {
                     double b = (*(--top)).asFloat();
                     double a = (*(--top)).asFloat();
                     *top++ = StandardLibrary::mathMax(a, b);
-                } else if (name == "math.random") {
+                } else if (name == "math.random" || name == "random") {
                     if (!isLibraryLoaded("math")) {
                         runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
                     }
-                    top -= argCount;
-                    *top++ = StandardLibrary::mathRandom();
+                    if (argCount == 0) {
+                        *top++ = StandardLibrary::mathRandom();
+                    } else if (argCount == 1) {
+                        double max = (*(--top)).asFloat();
+                        *top++ = StandardLibrary::mathRandom(max);
+                    } else {
+                        double b = (*(--top)).asFloat();
+                        double a = (*(--top)).asFloat();
+                        top -= (argCount - 2);
+                        *top++ = StandardLibrary::mathRandom(a, b);
+                    }
                 } else if (name == "math.sin") {
                     if (!isLibraryLoaded("math")) {
                         runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);

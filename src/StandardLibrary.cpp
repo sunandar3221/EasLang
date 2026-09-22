@@ -8,6 +8,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <algorithm>
+#include <random>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -333,13 +334,47 @@ Value StandardLibrary::mathMax(double a, double b) {
     return Value(std::max(a, b));
 }
 
+static std::mt19937_64& getRandomEngine() {
+    static thread_local std::mt19937_64 rng([]() {
+        uint64_t s1 = std::random_device{}();
+        uint64_t s2 = static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        return s1 ^ (s2 + 0x9e3779b97f4a7c15ULL + (s1 << 6) + (s1 >> 2));
+    }());
+    return rng;
+}
+
 Value StandardLibrary::mathRandom() {
-    static bool seeded = false;
-    if (!seeded) {
-        std::srand(static_cast<unsigned int>(std::time(nullptr)));
-        seeded = true;
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
+    return Value(dist(getRandomEngine()));
+}
+
+Value StandardLibrary::mathRandom(double max) {
+    if (max <= 0.0) return Value(static_cast<int64_t>(0));
+    if (max == std::floor(max)) {
+        int64_t high = static_cast<int64_t>(max);
+        std::uniform_int_distribution<int64_t> dist(1, high);
+        return Value(dist(getRandomEngine()));
     }
-    return Value(static_cast<double>(std::rand()) / (static_cast<double>(RAND_MAX) + 1.0));
+    std::uniform_real_distribution<double> dist(0.0, max);
+    return Value(dist(getRandomEngine()));
+}
+
+Value StandardLibrary::mathRandom(double min, double max) {
+    if (min > max) std::swap(min, max);
+    if (min == std::floor(min) && max == std::floor(max)) {
+        int64_t low = static_cast<int64_t>(min);
+        int64_t high = static_cast<int64_t>(max);
+        std::uniform_int_distribution<int64_t> dist(low, high);
+        return Value(dist(getRandomEngine()));
+    }
+    std::uniform_real_distribution<double> dist(min, max);
+    return Value(dist(getRandomEngine()));
+}
+
+Value StandardLibrary::mathRandom(const std::vector<Value>& args) {
+    if (args.empty()) return mathRandom();
+    if (args.size() == 1) return mathRandom(args[0].asFloat());
+    return mathRandom(args[0].asFloat(), args[1].asFloat());
 }
 
 Value StandardLibrary::mathSin(double val) {

@@ -36,6 +36,8 @@ void AotGenerator::collectVariables(ASTNode* node, std::unordered_set<std::strin
     } else if (auto* loopExpr = dynamic_cast<LoopExpr*>(node)) {
         collectVariables(loopExpr->count.get(), vars);
         collectVariables(loopExpr->body.get(), vars);
+    } else if (auto* retStmt = dynamic_cast<ReturnStmt*>(node)) {
+        if (retStmt->value) collectVariables(retStmt->value.get(), vars);
     }
 }
 
@@ -289,7 +291,13 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             return "StandardLibrary::mathMax(" + a + ", " + b + ")";
         }
         if (callee == "math.random" || callee == "random") {
-            return "StandardLibrary::mathRandom()";
+            if (call->arguments.empty()) {
+                return "StandardLibrary::mathRandom()";
+            } else if (call->arguments.size() == 1) {
+                return "StandardLibrary::mathRandom(Value(" + generateExpr(call->arguments[0].get()) + ").asFloat())";
+            } else {
+                return "StandardLibrary::mathRandom(Value(" + generateExpr(call->arguments[0].get()) + ").asFloat(), Value(" + generateExpr(call->arguments[1].get()) + ").asFloat())";
+            }
         }
         if (callee == "math.sin" || callee == "sin") {
             std::string arg = call->arguments.empty() ? "0.0" : "Value(" + generateExpr(call->arguments[0].get()) + ").asFloat()";
@@ -670,6 +678,28 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
 
     if (auto* useStmt = dynamic_cast<UseStmt*>(stmt)) {
         (void)useStmt;
+        return;
+    }
+
+    if (auto* retStmt = dynamic_cast<ReturnStmt*>(stmt)) {
+        emitIndent(ss);
+        if (retStmt->value) {
+            ss << "return " << generateExpr(retStmt->value.get()) << ";\n";
+        } else {
+            ss << "return Value();\n";
+        }
+        return;
+    }
+
+    if (dynamic_cast<BreakStmt*>(stmt)) {
+        emitIndent(ss);
+        ss << "break;\n";
+        return;
+    }
+
+    if (dynamic_cast<ContinueStmt*>(stmt)) {
+        emitIndent(ss);
+        ss << "continue;\n";
         return;
     }
 }

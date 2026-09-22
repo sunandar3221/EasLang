@@ -27,6 +27,7 @@ Parser::Parser(std::vector<Token> tokens)
     functionArity_["math.min"] = 2;
     functionArity_["math.max"] = 2;
     functionArity_["math.random"] = 0;
+    functionArity_["random"] = 0;
     functionArity_["math.sin"] = 1;
     functionArity_["math.cos"] = 1;
     functionArity_["math.tan"] = 1;
@@ -238,6 +239,9 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         case TokenType::LOOP: return parseLoop();
         case TokenType::WHILE: return parseWhile();
         case TokenType::FN: return parseFnDecl();
+        case TokenType::RETURN: return parseReturn();
+        case TokenType::BREAK: return parseBreak();
+        case TokenType::CONTINUE: return parseContinue();
         case TokenType::ELSE: {
             reportError("Unexpected 'else' without matching 'if'", peek());
             advance();
@@ -410,10 +414,11 @@ std::unique_ptr<Stmt> Parser::parseUse() {
 }
 
 std::unique_ptr<Stmt> Parser::parseIf() {
-    int line = advance().line;
+    Token keywordTok = advance();
+    int line = keywordTok.line;
     auto condition = parseExpression();
     if (!condition) {
-        reportError("Expected condition expression after 'if'", peek());
+        reportError("Expected condition expression after '" + keywordTok.lexeme + "'", peek());
     }
     if (check(TokenType::NEWLINE)) advance();
     auto thenBranch = parseBlock();
@@ -425,7 +430,7 @@ std::unique_ptr<Stmt> Parser::parseIf() {
         blk->statements.push_back(std::move(ifStmt));
         elseBranch = std::move(blk);
     } else if (match(TokenType::ELSE)) {
-        if (check(TokenType::IF)) {
+        if (check(TokenType::IF) || check(TokenType::ELIF)) {
             auto ifStmt = parseIf();
             auto blk = std::make_unique<BlockStmt>();
             blk->statements.push_back(std::move(ifStmt));
@@ -473,6 +478,28 @@ std::unique_ptr<Stmt> Parser::parseFnDecl() {
     skipNewlines();
     match(TokenType::END);
     return std::make_unique<FnDeclStmt>(std::move(name), std::move(params), std::move(body), line);
+}
+
+std::unique_ptr<Stmt> Parser::parseReturn() {
+    int line = advance().line;
+    std::unique_ptr<Expr> value = nullptr;
+    if (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !check(TokenType::END) && !isAtEnd()) {
+        value = parseExpression();
+    }
+    if (check(TokenType::NEWLINE)) advance();
+    return std::make_unique<ReturnStmt>(std::move(value), line);
+}
+
+std::unique_ptr<Stmt> Parser::parseBreak() {
+    int line = advance().line;
+    if (check(TokenType::NEWLINE)) advance();
+    return std::make_unique<BreakStmt>(line);
+}
+
+std::unique_ptr<Stmt> Parser::parseContinue() {
+    int line = advance().line;
+    if (check(TokenType::NEWLINE)) advance();
+    return std::make_unique<ContinueStmt>(line);
 }
 
 std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {

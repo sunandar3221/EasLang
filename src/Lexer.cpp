@@ -25,11 +25,20 @@ void Lexer::initKeywords() {
     keywords_["if"] = TokenType::IF;
     keywords_["else"] = TokenType::ELSE;
     keywords_["elif"] = TokenType::ELIF;
+    keywords_["elseif"] = TokenType::ELIF;
+    keywords_["break"] = TokenType::BREAK;
+    keywords_["continue"] = TokenType::CONTINUE;
+    keywords_["return"] = TokenType::RETURN;
     keywords_["loop"] = TokenType::LOOP;
     keywords_["while"] = TokenType::WHILE;
     keywords_["fn"] = TokenType::FN;
+    keywords_["def"] = TokenType::FN;
+    keywords_["func"] = TokenType::FN;
+    keywords_["function"] = TokenType::FN;
     keywords_["use"] = TokenType::USE;
     keywords_["import"] = TokenType::USE;
+    keywords_["include"] = TokenType::USE;
+    keywords_["require"] = TokenType::USE;
     keywords_["new"] = TokenType::NEW;
     keywords_["get"] = TokenType::GET;
     keywords_["set"] = TokenType::SET;
@@ -44,9 +53,13 @@ void Lexer::initKeywords() {
     keywords_["or"] = TokenType::OR;
     keywords_["not"] = TokenType::NOT;
     keywords_["true"] = TokenType::TRUE;
+    keywords_["True"] = TokenType::TRUE;
     keywords_["false"] = TokenType::FALSE;
+    keywords_["False"] = TokenType::FALSE;
     keywords_["nil"] = TokenType::NIL;
     keywords_["null"] = TokenType::NIL;
+    keywords_["None"] = TokenType::NIL;
+    keywords_["none"] = TokenType::NIL;
 }
 
 bool Lexer::isAtEnd() const {
@@ -320,6 +333,14 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             case ',': tokens.emplace_back(TokenType::COMMA, ",", curLine, curCol); break;
             case '.': tokens.emplace_back(TokenType::DOT, ".", curLine, curCol); break;
+            case '&':
+                if (match('&')) tokens.emplace_back(TokenType::AND, "&&", curLine, curCol);
+                else tokens.emplace_back(TokenType::AND, "&", curLine, curCol);
+                break;
+            case '|':
+                if (match('|')) tokens.emplace_back(TokenType::OR, "||", curLine, curCol);
+                else tokens.emplace_back(TokenType::OR, "|", curLine, curCol);
+                break;
             case ':': break;
             case '{': break;
             case '}': break;

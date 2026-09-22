@@ -252,3 +252,20 @@ public:
     UseStmt(std::string mod, int l = 0, int c = 0)
         : Stmt(l, c), moduleName(std::move(mod)) {}
 };
+
+class ReturnStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> value;
+    ReturnStmt(std::unique_ptr<Expr> val = nullptr, int l = 0, int c = 0)
+        : Stmt(l, c), value(std::move(val)) {}
+};
+
+class BreakStmt : public Stmt {
+public:
+    BreakStmt(int l = 0, int c = 0) : Stmt(l, c) {}
+};
+
+class ContinueStmt : public Stmt {
+public:
+    ContinueStmt(int l = 0, int c = 0) : Stmt(l, c) {}
+};

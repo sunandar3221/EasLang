@@ -2,6 +2,14 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 
+struct ReturnException {
+    Value value;
+    ReturnException(Value val) : value(std::move(val)) {}
+};
+
+struct BreakException {};
+struct ContinueException {};
+
 Interpreter::Interpreter()
     : globalEnv_(std::make_shared<Environment>()),
       currentEnv_(globalEnv_) {
@@ -53,6 +61,7 @@ void Interpreter::loadLibrary(const std::string& name) {
         mathObj.setProperty("pow", Value(ValueType::FUNCTION, "math.pow"));
         mathObj.setProperty("random", Value(ValueType::FUNCTION, "math.random"));
         globalEnv_->assign("math", mathObj);
+        globalEnv_->assign("random", Value(ValueType::FUNCTION, "math.random"));
     } else if (name == "time") {
         Value timeObj = Value::makeObject();
         timeObj.setProperty("now", Value(ValueType::FUNCTION, "time.now"));
@@ -86,7 +95,11 @@ std::shared_ptr<Environment> Interpreter::getGlobalEnvironment() const {
 
 Value Interpreter::interpret(BlockStmt* program) {
     if (!program) return Value();
-    return executeBlock(program, currentEnv_);
+    try {
+        return executeBlock(program, currentEnv_);
+    } catch (const ReturnException& ret) {
+        return ret.value;
+    }
 }
 
 Value Interpreter::executeBlock(BlockStmt* block, std::shared_ptr<Environment> env) {
@@ -96,8 +109,13 @@ Value Interpreter::executeBlock(BlockStmt* block, std::shared_ptr<Environment> e
         currentEnv_ = env;
     }
     Value lastValue;
-    for (const auto& stmt : block->statements) {
-        lastValue = execute(stmt.get());
+    try {
+        for (const auto& stmt : block->statements) {
+            lastValue = execute(stmt.get());
+        }
+    } catch (...) {
+        currentEnv_ = previous;
+        throw;
     }
     currentEnv_ = previous;
     return lastValue;
@@ -108,6 +126,19 @@ Value Interpreter::execute(Stmt* stmt) {
 
     if (auto* exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
         return evaluate(exprStmt->expression.get());
+    }
+
+    if (auto* retStmt = dynamic_cast<ReturnStmt*>(stmt)) {
+        Value val = retStmt->value ? evaluate(retStmt->value.get()) : Value();
+        throw ReturnException(val);
+    }
+
+    if (dynamic_cast<BreakStmt*>(stmt)) {
+        throw BreakException();
+    }
+
+    if (dynamic_cast<ContinueStmt*>(stmt)) {
+        throw ContinueException();
     }
 
     if (auto* assignStmt = dynamic_cast<AssignStmt*>(stmt)) {
@@ -139,7 +170,13 @@ Value Interpreter::execute(Stmt* stmt) {
         int64_t n = cntVal.asInt();
         Value lastVal;
         for (int64_t i = 0; i < n; ++i) {
-            lastVal = executeBlock(loopStmt->body.get(), currentEnv_);
+            try {
+                lastVal = executeBlock(loopStmt->body.get(), currentEnv_);
+            } catch (const BreakException&) {
+                break;
+            } catch (const ContinueException&) {
+                continue;
+            }
         }
         return lastVal;
     }
@@ -147,7 +184,13 @@ Value Interpreter::execute(Stmt* stmt) {
     if (auto* whileStmt = dynamic_cast<WhileStmt*>(stmt)) {
         Value lastVal;
         while (evaluate(whileStmt->condition.get()).isTruthy()) {
-            lastVal = executeBlock(whileStmt->body.get(), currentEnv_);
+            try {
+                lastVal = executeBlock(whileStmt->body.get(), currentEnv_);
+            } catch (const BreakException&) {
+                break;
+            } catch (const ContinueException&) {
+                continue;
+            }
         }
         return lastVal;
     }
@@ -524,11 +567,19 @@ Value Interpreter::evaluate(Expr* expr) {
             return StandardLibrary::mathMax(a, b);
         }
 
-        if (name == "math.random") {
+        if (name == "math.random" || name == "random") {
             if (!isLibraryLoaded("math")) {
                 throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
             }
-            return StandardLibrary::mathRandom();
+            if (call->arguments.empty()) {
+                return StandardLibrary::mathRandom();
+            } else if (call->arguments.size() == 1) {
+                return StandardLibrary::mathRandom(evaluate(call->arguments[0].get()).asFloat());
+            } else {
+                double a = evaluate(call->arguments[0].get()).asFloat();
+                double b = evaluate(call->arguments[1].get()).asFloat();
+                return StandardLibrary::mathRandom(a, b);
+            }
         }
 
         if (name == "math.sin") {
@@ -608,7 +659,11 @@ Value Interpreter::evaluate(Expr* expr) {
             for (size_t i = 0; i < fnDef.params.size() && i < call->arguments.size(); ++i) {
                 callEnv->define(fnDef.params[i], evaluate(call->arguments[i].get()));
             }
-            return executeBlock(fnDef.body.get(), callEnv);
+            try {
+                return executeBlock(fnDef.body.get(), callEnv);
+            } catch (const ReturnException& ret) {
+                return ret.value;
+            }
         }
 
         throw std::runtime_error("Undefined function '" + name + "' at line " + std::to_string(call->line));

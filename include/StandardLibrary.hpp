@@ -32,6 +32,9 @@ public:
     static Value mathMin(double a, double b);
     static Value mathMax(double a, double b);
     static Value mathRandom();
+    static Value mathRandom(double max);
+    static Value mathRandom(double min, double max);
+    static Value mathRandom(const std::vector<Value>& args);
     static Value mathSin(double val);
     static Value mathCos(double val);
     static Value mathTan(double val);

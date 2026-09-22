@@ -136,6 +136,34 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         return;
     }
 
+    if (auto* retStmt = dynamic_cast<ReturnStmt*>(stmt)) {
+        if (retStmt->value) {
+            compileExpr(retStmt->value.get());
+        } else {
+            currentChunk_->emitOp(OpCode::OP_NIL, retStmt->line);
+        }
+        currentChunk_->emitOp(OpCode::OP_RETURN, retStmt->line);
+        return;
+    }
+
+    if (auto* breakStmt = dynamic_cast<BreakStmt*>(stmt)) {
+        if (loopStack_.empty()) {
+            throw std::runtime_error("Cannot use 'break' outside of a loop at line " + std::to_string(breakStmt->line));
+        }
+        size_t jump = emitJump(OpCode::OP_JUMP, breakStmt->line);
+        loopStack_.back().breakJumps.push_back(jump);
+        return;
+    }
+
+    if (auto* continueStmt = dynamic_cast<ContinueStmt*>(stmt)) {
+        if (loopStack_.empty()) {
+            throw std::runtime_error("Cannot use 'continue' outside of a loop at line " + std::to_string(continueStmt->line));
+        }
+        size_t jump = emitJump(OpCode::OP_JUMP, continueStmt->line);
+        loopStack_.back().continueJumps.push_back(jump);
+        return;
+    }
+
     if (auto* ifStmt = dynamic_cast<IfStmt*>(stmt)) {
         compileExpr(ifStmt->condition.get());
         size_t thenJump = emitJump(OpCode::OP_JUMP_IF_FALSE, ifStmt->line);
@@ -156,10 +184,23 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         compileExpr(whileStmt->condition.get());
         size_t exitJump = emitJump(OpCode::OP_JUMP_IF_FALSE, whileStmt->line);
         currentChunk_->emitOp(OpCode::OP_POP, whileStmt->line);
+
+        loopStack_.push_back({ {}, {} });
         compileBlock(whileStmt->body.get());
+        LoopContext loopCtx = loopStack_.back();
+        loopStack_.pop_back();
+
+        for (size_t cj : loopCtx.continueJumps) {
+            patchJump(cj);
+        }
+
         emitLoop(loopStart, whileStmt->line);
         patchJump(exitJump);
         currentChunk_->emitOp(OpCode::OP_POP, whileStmt->line);
+
+        for (size_t bj : loopCtx.breakJumps) {
+            patchJump(bj);
+        }
         return;
     }
 
@@ -180,7 +221,14 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         size_t exitJump = emitJump(OpCode::OP_JUMP_IF_FALSE, loopStmt->line);
         currentChunk_->emitOp(OpCode::OP_POP, loopStmt->line);
 
+        loopStack_.push_back({ {}, {} });
         compileBlock(loopStmt->body.get());
+        LoopContext loopCtx = loopStack_.back();
+        loopStack_.pop_back();
+
+        for (size_t cj : loopCtx.continueJumps) {
+            patchJump(cj);
+        }
 
         currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopStmt->line);
         currentChunk_->emitShort(static_cast<uint16_t>(slot), loopStmt->line);
@@ -193,6 +241,10 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         emitLoop(loopStart, loopStmt->line);
         patchJump(exitJump);
         currentChunk_->emitOp(OpCode::OP_POP, loopStmt->line);
+
+        for (size_t bj : loopCtx.breakJumps) {
+            patchJump(bj);
+        }
         return;
     }
 
@@ -202,11 +254,13 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         auto prevLocals = locals_;
         int prevDepth = scopeDepth_;
         int prevMax = maxLocals_;
+        auto prevLoopStack = loopStack_;
 
         currentChunk_ = fnChunk.get();
         locals_.clear();
         scopeDepth_ = 1;
         maxLocals_ = 0;
+        loopStack_.clear();
 
         for (const auto& p : fnDecl->params) {
             addLocal(p);
@@ -223,6 +277,7 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         locals_ = prevLocals;
         scopeDepth_ = prevDepth;
         maxLocals_ = prevMax;
+        loopStack_ = prevLoopStack;
         return;
     }
 

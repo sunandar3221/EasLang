@@ -13,12 +13,16 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::FALSE: return "FALSE";
         case TokenType::NIL: return "NIL";
         case TokenType::PRINT: return "PRINT";
+        case TokenType::SILENT_PRINT: return "SILENT_PRINT";
         case TokenType::IF: return "IF";
         case TokenType::ELSE: return "ELSE";
         case TokenType::ELIF: return "ELIF";
         case TokenType::LOOP: return "LOOP";
         case TokenType::WHILE: return "WHILE";
         case TokenType::FN: return "FN";
+        case TokenType::RETURN: return "RETURN";
+        case TokenType::BREAK: return "BREAK";
+        case TokenType::CONTINUE: return "CONTINUE";
         case TokenType::USE: return "USE";
         case TokenType::NEW: return "NEW";
         case TokenType::GET: return "GET";

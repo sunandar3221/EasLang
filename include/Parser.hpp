@@ -46,6 +46,9 @@ private:
     std::unique_ptr<Stmt> parseLoop();
     std::unique_ptr<Stmt> parseWhile();
     std::unique_ptr<Stmt> parseFnDecl();
+    std::unique_ptr<Stmt> parseReturn();
+    std::unique_ptr<Stmt> parseBreak();
+    std::unique_ptr<Stmt> parseContinue();
     std::unique_ptr<Stmt> parseAssignmentOrExpr();
 
     std::unique_ptr<Expr> parseExpression();

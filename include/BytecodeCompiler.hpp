@@ -26,6 +26,11 @@ private:
     int scopeDepth_;
     int maxLocals_;
     std::unordered_map<std::string, std::shared_ptr<Chunk>> functions_;
+    struct LoopContext {
+        std::vector<size_t> breakJumps;
+        std::vector<size_t> continueJumps;
+    };
+    std::vector<LoopContext> loopStack_;
 
     void compileStmt(Stmt* stmt);
     void compileBlock(BlockStmt* block);
