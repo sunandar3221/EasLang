@@ -89,8 +89,25 @@ static std::unordered_map<int64_t, ManagedFileHandle> g_managedFiles;
 static int64_t g_nextManagedFileId = 1;
 static std::mutex g_managedFileMutex;
 
+static std::string sanitizePath(const std::string& path) {
+    std::string clean = path;
+    while (!clean.empty() && (clean.back() == '\r' || clean.back() == '\n' || clean.back() == ' ' || clean.back() == '\t')) {
+        clean.pop_back();
+    }
+    size_t start = 0;
+    while (start < clean.size() && (clean[start] == ' ' || clean[start] == '\t')) {
+        start++;
+    }
+    if (start > 0) {
+        clean = clean.substr(start);
+    }
+    return clean;
+}
+
 Value StandardLibrary::readFile(const std::string& path) {
-    FILE* fp = fopen(path.c_str(), "rb");
+    std::string cleanPath = sanitizePath(path);
+    if (cleanPath.empty()) return Value("");
+    FILE* fp = fopen(cleanPath.c_str(), "rb");
     if (!fp) {
         return Value("");
     }
@@ -112,23 +129,33 @@ Value StandardLibrary::readFile(const std::string& path) {
 }
 
 Value StandardLibrary::writeFile(const std::string& path, const std::string& content) {
-    FILE* fp = fopen(path.c_str(), "wb");
+    std::string cleanPath = sanitizePath(path);
+    if (cleanPath.empty()) return Value(false);
+    FILE* fp = fopen(cleanPath.c_str(), "wb");
     if (!fp) {
         return Value(false);
     }
-    setvbuf(fp, NULL, _IOFBF, 262144);
-    size_t written = fwrite(content.data(), 1, content.size(), fp);
+    size_t written = 0;
+    if (!content.empty()) {
+        written = fwrite(content.data(), 1, content.size(), fp);
+    }
+    fflush(fp);
     fclose(fp);
     return Value(written == content.size());
 }
 
 Value StandardLibrary::appendFile(const std::string& path, const std::string& content) {
-    FILE* fp = fopen(path.c_str(), "ab");
+    std::string cleanPath = sanitizePath(path);
+    if (cleanPath.empty()) return Value(false);
+    FILE* fp = fopen(cleanPath.c_str(), "ab");
     if (!fp) {
         return Value(false);
     }
-    setvbuf(fp, NULL, _IOFBF, 262144);
-    size_t written = fwrite(content.data(), 1, content.size(), fp);
+    size_t written = 0;
+    if (!content.empty()) {
+        written = fwrite(content.data(), 1, content.size(), fp);
+    }
+    fflush(fp);
     fclose(fp);
     return Value(written == content.size());
 }
@@ -137,11 +164,12 @@ Value StandardLibrary::writeLines(const std::string& path, const Value& listVal)
     if (!listVal.isList() || !listVal.listVal) {
         return Value(false);
     }
-    FILE* fp = fopen(path.c_str(), "wb");
+    std::string cleanPath = sanitizePath(path);
+    if (cleanPath.empty()) return Value(false);
+    FILE* fp = fopen(cleanPath.c_str(), "wb");
     if (!fp) {
         return Value(false);
     }
-    setvbuf(fp, NULL, _IOFBF, 262144);
     for (const auto& item : *listVal.listVal) {
         std::string s = item.toString();
         if (!s.empty()) {
@@ -149,20 +177,22 @@ Value StandardLibrary::writeLines(const std::string& path, const Value& listVal)
         }
         fputc('\n', fp);
     }
+    fflush(fp);
     fclose(fp);
     return Value(true);
 }
 
 Value StandardLibrary::openFile(const std::string& path, const std::string& mode) {
+    std::string cleanPath = sanitizePath(path);
+    if (cleanPath.empty()) return Value();
     std::string actualMode = mode.empty() ? "w" : mode;
     if (actualMode.find('b') == std::string::npos && actualMode.find('+') == std::string::npos) {
         actualMode += "b";
     }
-    FILE* fp = fopen(path.c_str(), actualMode.c_str());
+    FILE* fp = fopen(cleanPath.c_str(), actualMode.c_str());
     if (!fp) {
         return Value();
     }
-    setvbuf(fp, NULL, _IOFBF, 262144);
     std::lock_guard<std::mutex> lock(g_managedFileMutex);
     int64_t handleId = g_nextManagedFileId++;
     ManagedFileHandle handle;
@@ -171,7 +201,7 @@ Value StandardLibrary::openFile(const std::string& path, const std::string& mode
 
     Value obj = Value::makeObject();
     obj.setProperty("__handle", Value(handleId));
-    obj.setProperty("path", Value(path));
+    obj.setProperty("path", Value(cleanPath));
     obj.setProperty("mode", Value(mode));
     obj.setProperty("is_open", Value(true));
     return obj;

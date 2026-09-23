@@ -189,16 +189,16 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             std::string p = call->arguments.empty() ? "\"\"" : "(Value(" + generateExpr(call->arguments[0].get()) + ")).toString()";
             return "StandardLibrary::input(" + p + ")";
         }
-        if ((callee == "read" || callee == "io.read") && !call->arguments.empty()) {
+        if ((callee == "read" || callee == "io.read" || callee == "readFile" || callee == "io.readFile") && !call->arguments.empty()) {
             return "StandardLibrary::readFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString())";
         }
-        if ((callee == "write" || callee == "io.write") && call->arguments.size() >= 2) {
+        if ((callee == "write" || callee == "io.write" || callee == "writeFile" || callee == "io.writeFile") && call->arguments.size() >= 2) {
             return "StandardLibrary::writeFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
         }
-        if ((callee == "append" || callee == "io.append") && call->arguments.size() >= 2) {
+        if ((callee == "append" || callee == "io.append" || callee == "appendFile" || callee == "io.appendFile") && call->arguments.size() >= 2) {
             return "StandardLibrary::appendFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
         }
-        if ((callee == "write_lines" || callee == "io.write_lines") && call->arguments.size() >= 2) {
+        if ((callee == "write_lines" || callee == "io.write_lines" || callee == "writeLines" || callee == "io.writeLines") && call->arguments.size() >= 2) {
             return "StandardLibrary::writeLines((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), Value(" + generateExpr(call->arguments[1].get()) + "))";
         }
         if (callee == "open" || callee == "io.open") {
@@ -380,7 +380,7 @@ std::string AotGenerator::generateExpr(Expr* expr) {
                 std::string arg = !call->arguments.empty() ? "(Value(" + generateExpr(call->arguments[0].get()) + ")).toString()" : "\"\"";
                 return "([&](){ auto _tgt = " + varName + "; if (_tgt.isObject() && _tgt.objVal) { auto _h = _tgt.objVal->find(\"__handle\"); if (_h != _tgt.objVal->end()) return StandardLibrary::fileWrite(_h->second.asInt(), " + arg + "); } return Value(false); })()";
             }
-            if (method == "writeline" || method == "write_line") {
+            if (method == "writeline" || method == "write_line" || method == "writeLine") {
                 std::string arg = !call->arguments.empty() ? "(Value(" + generateExpr(call->arguments[0].get()) + ")).toString()" : "\"\"";
                 return "([&](){ auto _tgt = " + varName + "; if (_tgt.isObject() && _tgt.objVal) { auto _h = _tgt.objVal->find(\"__handle\"); if (_h != _tgt.objVal->end()) return StandardLibrary::fileWriteLine(_h->second.asInt(), " + arg + "); } return Value(false); })()";
             }
@@ -390,6 +390,7 @@ std::string AotGenerator::generateExpr(Expr* expr) {
             if (method == "close") {
                 return "([&](){ auto _tgt = " + varName + "; if (_tgt.isObject() && _tgt.objVal) { auto _h = _tgt.objVal->find(\"__handle\"); if (_h != _tgt.objVal->end()) return StandardLibrary::fileClose(_h->second.asInt()); } return Value(false); })()";
             }
+            return "(Value(" + varName + ")).getProperty(\"" + method + "\")";
         }
 
         std::string s = "fn_" + callee + "(";
@@ -1208,8 +1209,22 @@ public:
         return Value("");
     }
 
+    static std::string sanitizePath(const std::string& raw) {
+        std::string s = raw;
+        while (!s.empty() && (s.back() == '\r' || s.back() == '\n' || s.back() == ' ' || s.back() == '\t')) {
+            s.pop_back();
+        }
+        size_t start = 0;
+        while (start < s.size() && (s[start] == ' ' || s[start] == '\t' || s[start] == '\r' || s[start] == '\n')) {
+            start++;
+        }
+        if (start > 0) s = s.substr(start);
+        return s;
+    }
+
     static Value readFile(const std::string& path) {
-        FILE* fp = fopen(path.c_str(), "rb");
+        std::string cleanPath = sanitizePath(path);
+        FILE* fp = fopen(cleanPath.c_str(), "rb");
         if (!fp) return Value("");
         fseek(fp, 0, SEEK_END);
         long sz = ftell(fp);
@@ -1224,33 +1239,42 @@ public:
     }
 
     static Value writeFile(const std::string& path, const std::string& content) {
-        FILE* fp = fopen(path.c_str(), "wb");
+        std::string cleanPath = sanitizePath(path);
+        FILE* fp = fopen(cleanPath.c_str(), "wb");
         if (!fp) return Value(false);
-        setvbuf(fp, NULL, _IOFBF, 262144);
-        size_t written = fwrite(content.data(), 1, content.size(), fp);
+        size_t written = 0;
+        if (!content.empty()) {
+            written = fwrite(content.data(), 1, content.size(), fp);
+        }
+        fflush(fp);
         fclose(fp);
         return Value(written == content.size());
     }
 
     static Value appendFile(const std::string& path, const std::string& content) {
-        FILE* fp = fopen(path.c_str(), "ab");
+        std::string cleanPath = sanitizePath(path);
+        FILE* fp = fopen(cleanPath.c_str(), "ab");
         if (!fp) return Value(false);
-        setvbuf(fp, NULL, _IOFBF, 262144);
-        size_t written = fwrite(content.data(), 1, content.size(), fp);
+        size_t written = 0;
+        if (!content.empty()) {
+            written = fwrite(content.data(), 1, content.size(), fp);
+        }
+        fflush(fp);
         fclose(fp);
         return Value(written == content.size());
     }
 
     static Value writeLines(const std::string& path, const Value& listVal) {
         if (!listVal.isList() || !listVal.listVal) return Value(false);
-        FILE* fp = fopen(path.c_str(), "wb");
+        std::string cleanPath = sanitizePath(path);
+        FILE* fp = fopen(cleanPath.c_str(), "wb");
         if (!fp) return Value(false);
-        setvbuf(fp, NULL, _IOFBF, 262144);
         for (const auto& item : *listVal.listVal) {
             std::string s = item.toString();
             if (!s.empty()) fwrite(s.data(), 1, s.size(), fp);
             fputc('\n', fp);
         }
+        fflush(fp);
         fclose(fp);
         return Value(true);
     }
@@ -1261,18 +1285,18 @@ public:
     }
 
     static Value openFile(const std::string& path, const std::string& mode) {
+        std::string cleanPath = sanitizePath(path);
         std::string actualMode = mode.empty() ? "w" : mode;
         if (actualMode.find('b') == std::string::npos && actualMode.find('+') == std::string::npos) actualMode += "b";
-        FILE* fp = fopen(path.c_str(), actualMode.c_str());
+        FILE* fp = fopen(cleanPath.c_str(), actualMode.c_str());
         if (!fp) return Value();
         static int64_t s_id = 1;
         int64_t hid = s_id++;
-        setvbuf(fp, NULL, _IOFBF, 262144);
         getAotFiles()[hid] = fp;
 
         Value obj = Value::makeObject();
         obj.setProperty("__handle", Value(hid));
-        obj.setProperty("path", Value(path));
+        obj.setProperty("path", Value(cleanPath));
         obj.setProperty("mode", Value(mode));
         obj.setProperty("is_open", Value(true));
         return obj;

@@ -55,7 +55,8 @@ enum class OpCode : uint8_t {
     OP_JUMP_IF_LOCAL_GT_CONST,
     OP_JUMP_IF_LOCAL_LE_CONST,
     OP_JUMP_IF_LOCAL_LT_CONST,
-    OP_FAST_LOOP
+    OP_FAST_LOOP,
+    OP_APPEND_LOCAL
 };
 
 class Chunk {

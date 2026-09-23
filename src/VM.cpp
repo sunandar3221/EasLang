@@ -638,21 +638,21 @@ Value VM::run(Chunk* chunk) {
                         top -= argCount;
                     }
                     *top++ = StandardLibrary::input(prompt);
-                } else if (name == "read" || name == "io.read") {
+                } else if (name == "read" || name == "io.read" || name == "readFile" || name == "io.readFile") {
                     requireModule("io", name);
                     Value path = *(--top);
                     *top++ = StandardLibrary::readFile(path.toString());
-                } else if (name == "write" || name == "io.write") {
+                } else if (name == "write" || name == "io.write" || name == "writeFile" || name == "io.writeFile") {
                     requireModule("io", name);
                     Value c = *(--top);
                     Value p = *(--top);
                     *top++ = StandardLibrary::writeFile(p.toString(), c.toString());
-                } else if (name == "append" || name == "io.append") {
+                } else if (name == "append" || name == "io.append" || name == "appendFile" || name == "io.appendFile") {
                     requireModule("io", name);
                     Value c = *(--top);
                     Value p = *(--top);
                     *top++ = StandardLibrary::appendFile(p.toString(), c.toString());
-                } else if (name == "write_lines" || name == "io.write_lines") {
+                } else if (name == "write_lines" || name == "io.write_lines" || name == "writeLines" || name == "io.writeLines") {
                     requireModule("io", name);
                     Value lines = *(--top);
                     Value p = *(--top);
@@ -829,7 +829,7 @@ Value VM::run(Chunk* chunk) {
                                         if (argCount > 1) top -= (argCount - 1);
                                         *top++ = StandardLibrary::fileWrite(handleId, text);
                                         break;
-                                    } else if (method == "writeline" || method == "write_line") {
+                                    } else if (method == "writeline" || method == "write_line" || method == "writeLine") {
                                         std::string text = argCount > 0 ? (*(--top)).toString() : "";
                                         if (argCount > 1) top -= (argCount - 1);
                                         *top++ = StandardLibrary::fileWriteLine(handleId, text);
@@ -1121,6 +1121,30 @@ Value VM::run(Chunk* chunk) {
                 ip += 4;
                 if (--slots[slot].intVal > 0) {
                     ip -= offset;
+                }
+                break;
+            }
+            case OpCode::OP_APPEND_LOCAL: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                ip += 2;
+                Value val = *(--top);
+                Value& loc = slots[slot];
+                if (__builtin_expect(loc.type == ValueType::STRING, 1)) {
+                    if (val.type == ValueType::STRING) {
+                        loc.strVal.append(val.strVal);
+                    } else {
+                        loc.strVal.append(val.toString());
+                    }
+                } else if (loc.type == ValueType::INT && val.type == ValueType::INT) {
+                    loc.intVal += val.intVal;
+                    loc.floatVal = static_cast<double>(loc.intVal);
+                } else if (loc.type == ValueType::LIST && val.type == ValueType::LIST) {
+                    if (val.listVal) {
+                        if (!loc.listVal) loc.listVal = std::make_shared<std::vector<Value>>();
+                        loc.listVal->insert(loc.listVal->end(), val.listVal->begin(), val.listVal->end());
+                    }
+                } else {
+                    loc = loc + val;
                 }
                 break;
             }

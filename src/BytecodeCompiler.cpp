@@ -227,6 +227,26 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
                         return;
                     }
                 }
+
+                // In-place append optimization: var = var + part1 + part2 + ...
+                std::vector<Expr*> appendParts;
+                Expr* curr = assign->value.get();
+                while (auto* b = dynamic_cast<BinaryExpr*>(curr)) {
+                    if (b->op != TokenType::PLUS) break;
+                    appendParts.push_back(b->right.get());
+                    curr = b->left.get();
+                }
+                if (auto* rootVar = dynamic_cast<VarExpr*>(curr)) {
+                    if (rootVar->name == assign->name && !appendParts.empty()) {
+                        std::reverse(appendParts.begin(), appendParts.end());
+                        for (Expr* part : appendParts) {
+                            compileExpr(part);
+                            currentChunk_->emitOp(OpCode::OP_APPEND_LOCAL, assign->line);
+                            currentChunk_->emitShort(static_cast<uint16_t>(local), assign->line);
+                        }
+                        return;
+                    }
+                }
             }
 
             compileExpr(assign->value.get());
