@@ -843,6 +843,9 @@ std::string AotGenerator::getRuntimeSource() {
 #include <cctype>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX 1
+#endif
 #include <windows.h>
 #include <wininet.h>
 #else
@@ -1181,8 +1184,8 @@ public:
     static Value mathFloor(double val) { return Value(std::floor(val)); }
     static Value mathCeil(double val) { return Value(std::ceil(val)); }
     static Value mathRound(double val) { return Value(std::round(val)); }
-    static Value mathMin(double a, double b) { return Value(std::min(a, b)); }
-    static Value mathMax(double a, double b) { return Value(std::max(a, b)); }
+    static Value mathMin(double a, double b) { return Value((std::min)(a, b)); }
+    static Value mathMax(double a, double b) { return Value((std::max)(a, b)); }
     static Value mathSin(double val) { return Value(std::sin(val)); }
     static Value mathCos(double val) { return Value(std::cos(val)); }
     static Value mathTan(double val) { return Value(std::tan(val)); }
@@ -1341,14 +1344,22 @@ bool AotGenerator::buildBinary(const std::string& sourceFile, const std::string&
         const char* envCxx = std::getenv("CXX");
         if (envCxx && *envCxx) {
             compiler = envCxx;
+        } else if (hasCommand("g++")) {
+            compiler = "g++";
         } else if (hasCommand("clang++")) {
             compiler = "clang++";
         }
-        std::string cmd = compiler + " -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
+
+        std::string lto = (compiler.find("clang") != std::string::npos) ? "" : "-flto";
+        std::string cmd = compiler + " -std=c++20 -O3 " + lto + " -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
         res = std::system(cmd.c_str());
         if (res != 0) {
-            std::string fallbackCmd = compiler + " -std=c++20 -O3 " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
+            std::string fallbackCmd = compiler + " -std=c++20 -O3 -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
             res = std::system(fallbackCmd.c_str());
+            if (res != 0) {
+                std::string simpleCmd = compiler + " -std=c++20 -O3 " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
+                res = std::system(simpleCmd.c_str());
+            }
         }
 #else
         std::string winCompiler;
