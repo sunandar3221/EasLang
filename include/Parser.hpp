@@ -22,7 +22,7 @@ private:
     int anonFnCounter_;
     std::vector<std::unique_ptr<FnDeclStmt>> hoistedAnonFns_;
     std::vector<std::string> errors_;
-    void reportError(const std::string& message, const Token& token);
+    void reportError(const std::string& message, const Token& token, const std::string& customRecommendation = "", const std::string& customHint = "");
 
     bool isAtEnd() const;
     const Token& peek() const;

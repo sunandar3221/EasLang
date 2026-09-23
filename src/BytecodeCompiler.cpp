@@ -360,21 +360,21 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
         if (scopeDepth_ > 0) {
             int local = resolveLocal(var->name);
             if (local >= 0) {
-                currentChunk_->emitOp(OpCode::OP_GET_LOCAL, var->line);
-                currentChunk_->emitShort(static_cast<uint16_t>(local), var->line);
+                currentChunk_->emitOp(OpCode::OP_GET_LOCAL, var->line, var->column, static_cast<int>(var->name.size()));
+                currentChunk_->emitShort(static_cast<uint16_t>(local), var->line, var->column, static_cast<int>(var->name.size()));
                 return;
             }
         }
         auto it = functions_.find(var->name);
         if (it != functions_.end()) {
             size_t idx = currentChunk_->addConstant(Value(ValueType::FUNCTION, var->name));
-            currentChunk_->emitOp(OpCode::OP_CONSTANT, var->line);
-            currentChunk_->emitShort(static_cast<uint16_t>(idx), var->line);
+            currentChunk_->emitOp(OpCode::OP_CONSTANT, var->line, var->column, static_cast<int>(var->name.size()));
+            currentChunk_->emitShort(static_cast<uint16_t>(idx), var->line, var->column, static_cast<int>(var->name.size()));
             return;
         }
         size_t idx = currentChunk_->addConstant(Value(var->name));
-        currentChunk_->emitOp(OpCode::OP_GET_GLOBAL, var->line);
-        currentChunk_->emitShort(static_cast<uint16_t>(idx), var->line);
+        currentChunk_->emitOp(OpCode::OP_GET_GLOBAL, var->line, var->column, static_cast<int>(var->name.size()));
+        currentChunk_->emitShort(static_cast<uint16_t>(idx), var->line, var->column, static_cast<int>(var->name.size()));
         return;
     }
 
@@ -491,17 +491,17 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
         compileExpr(bin->left.get());
         compileExpr(bin->right.get());
         switch (bin->op) {
-            case TokenType::PLUS: currentChunk_->emitOp(OpCode::OP_ADD, bin->line); break;
-            case TokenType::MINUS: currentChunk_->emitOp(OpCode::OP_SUB, bin->line); break;
-            case TokenType::STAR: currentChunk_->emitOp(OpCode::OP_MUL, bin->line); break;
-            case TokenType::SLASH: currentChunk_->emitOp(OpCode::OP_DIV, bin->line); break;
-            case TokenType::PERCENT: currentChunk_->emitOp(OpCode::OP_MOD, bin->line); break;
-            case TokenType::EQUAL_EQUAL: currentChunk_->emitOp(OpCode::OP_EQUAL, bin->line); break;
-            case TokenType::BANG_EQUAL: currentChunk_->emitOp(OpCode::OP_NOT_EQUAL, bin->line); break;
-            case TokenType::LESS: currentChunk_->emitOp(OpCode::OP_LESS, bin->line); break;
-            case TokenType::GREATER: currentChunk_->emitOp(OpCode::OP_GREATER, bin->line); break;
-            case TokenType::LESS_EQUAL: currentChunk_->emitOp(OpCode::OP_LESS_EQUAL, bin->line); break;
-            case TokenType::GREATER_EQUAL: currentChunk_->emitOp(OpCode::OP_GREATER_EQUAL, bin->line); break;
+            case TokenType::PLUS: currentChunk_->emitOp(OpCode::OP_ADD, bin->line, bin->column, 1); break;
+            case TokenType::MINUS: currentChunk_->emitOp(OpCode::OP_SUB, bin->line, bin->column, 1); break;
+            case TokenType::STAR: currentChunk_->emitOp(OpCode::OP_MUL, bin->line, bin->column, 1); break;
+            case TokenType::SLASH: currentChunk_->emitOp(OpCode::OP_DIV, bin->line, bin->column, 1); break;
+            case TokenType::PERCENT: currentChunk_->emitOp(OpCode::OP_MOD, bin->line, bin->column, 1); break;
+            case TokenType::EQUAL_EQUAL: currentChunk_->emitOp(OpCode::OP_EQUAL, bin->line, bin->column, 2); break;
+            case TokenType::BANG_EQUAL: currentChunk_->emitOp(OpCode::OP_NOT_EQUAL, bin->line, bin->column, 2); break;
+            case TokenType::LESS: currentChunk_->emitOp(OpCode::OP_LESS, bin->line, bin->column, 1); break;
+            case TokenType::GREATER: currentChunk_->emitOp(OpCode::OP_GREATER, bin->line, bin->column, 1); break;
+            case TokenType::LESS_EQUAL: currentChunk_->emitOp(OpCode::OP_LESS_EQUAL, bin->line, bin->column, 2); break;
+            case TokenType::GREATER_EQUAL: currentChunk_->emitOp(OpCode::OP_GREATER_EQUAL, bin->line, bin->column, 2); break;
             default: break;
         }
         return;
@@ -509,8 +509,8 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
 
     if (auto* un = dynamic_cast<UnaryExpr*>(expr)) {
         compileExpr(un->right.get());
-        if (un->op == TokenType::MINUS) currentChunk_->emitOp(OpCode::OP_NEGATE, un->line);
-        if (un->op == TokenType::NOT) currentChunk_->emitOp(OpCode::OP_NOT, un->line);
+        if (un->op == TokenType::MINUS) currentChunk_->emitOp(OpCode::OP_NEGATE, un->line, un->column, 1);
+        if (un->op == TokenType::NOT) currentChunk_->emitOp(OpCode::OP_NOT, un->line, un->column, 3);
         return;
     }
 
@@ -519,15 +519,16 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
             compileExpr(a.get());
         }
         size_t idx = currentChunk_->addConstant(Value(call->callee));
-        currentChunk_->emitOp(OpCode::OP_CALL, call->line);
-        currentChunk_->emitShort(static_cast<uint16_t>(idx), call->line);
-        currentChunk_->emit(static_cast<uint8_t>(call->arguments.size()), call->line);
+        int cLen = static_cast<int>(call->callee.size());
+        currentChunk_->emitOp(OpCode::OP_CALL, call->line, call->column, cLen);
+        currentChunk_->emitShort(static_cast<uint16_t>(idx), call->line, call->column, cLen);
+        currentChunk_->emit(static_cast<uint8_t>(call->arguments.size()), call->line, call->column, cLen);
         return;
     }
 
     if (auto* readExpr = dynamic_cast<ReadExpr*>(expr)) {
         compileExpr(readExpr->path.get());
-        currentChunk_->emitOp(OpCode::OP_READ, readExpr->line);
+        currentChunk_->emitOp(OpCode::OP_READ, readExpr->line, readExpr->column, 4);
         return;
     }
 
@@ -535,12 +536,12 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
         compileExpr(getExpr->target.get());
         if (getExpr->property) {
             compileExpr(getExpr->property.get());
-            currentChunk_->emitOp(OpCode::OP_GET_PROP, getExpr->line);
+            currentChunk_->emitOp(OpCode::OP_GET_PROP, getExpr->line, getExpr->column, 1);
         } else {
             size_t idx = currentChunk_->addConstant(Value("get"));
-            currentChunk_->emitOp(OpCode::OP_CALL, getExpr->line);
-            currentChunk_->emitShort(static_cast<uint16_t>(idx), getExpr->line);
-            currentChunk_->emit(1, getExpr->line);
+            currentChunk_->emitOp(OpCode::OP_CALL, getExpr->line, getExpr->column, 3);
+            currentChunk_->emitShort(static_cast<uint16_t>(idx), getExpr->line, getExpr->column, 3);
+            currentChunk_->emit(1, getExpr->line, getExpr->column, 3);
         }
         return;
     }

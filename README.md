@@ -12,9 +12,10 @@ Proyek ini dilisensikan di bawah **MIT License**.
 3. [Kursus Kilat EasLang (Crash Course)](#3-kursus-kilat-easlang-crash-course)
    - [Bab 13: Tutorial Kilat & Panduan Lengkap Seluruh Modul Bawaan](#bab-13-tutorial-kilat--panduan-lengkap-seluruh-modul-bawaan-standard-library-deep-dive)
 4. [Kamus Keyword & Operator](#4-kamus-keyword--operator)
-5. [Hasil Benchmark & Komparasi Kecepatan](#5-hasil-benchmark--komparasi-kecepatan)
-6. [Panduan Eksekusi & Kompilasi AOT](#6-panduan-eksekusi--kompilasi-aot)
-7. [Lisensi](#7-lisensi)
+5. [Sistem Diagnostik Cerdas & Rekomendasi Typo](#5-sistem-diagnostik-cerdas--rekomendasi-typo)
+6. [Hasil Benchmark & Komparasi Kecepatan](#6-hasil-benchmark--komparasi-kecepatan)
+7. [Panduan Eksekusi & Kompilasi AOT (Linux, Android Termux, Windows)](#7-panduan-eksekusi--kompilasi-aot-linux-android-termux-windows)
+8. [Lisensi](#8-lisensi)
 
 ---
 
@@ -853,7 +854,44 @@ Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use
 
 ---
 
-## 5. Hasil Benchmark & Komparasi Kecepatan
+## 5. Sistem Diagnostik Cerdas & Rekomendasi Typo
+
+EasLang dilengkapi dengan **Mesin Diagnostik Kontekstual Modern** yang ramah developer (*developer-friendly*), terinspirasi dari gaya diagnostik Python 3.11+ dan Rust, namun dirancang khusus khas EasLang.
+
+### Fitur Utama Diagnostik:
+- **Tampilan Visual Presisi**: Menampilkan nama file, nomor baris, nomor kolom, kutipan baris kode sumber, dan penunjuk caret (`^^^^`) tepat pada token yang bermasalah.
+- **Deteksi Typo Cerdas (Fuzzy Suggestion)**: Menggunakan algoritma *Damerau-Levenshtein Distance* untuk mengenali salah ketik (typo) pada:
+  - **Keyword**: Misalnya `whlie` disarankan menjadi `while`, `elsif` disarankan menjadi `elseif`/`elif`, `pirnt` disarankan menjadi `print`.
+  - **Variabel dalam Scope**: Jika Anda salah mengetik variabel misalnya `tebakn`, mesin otomatis menganalisis variabel yang telah didefinisikan sebelumnya dan menyarankan `tebakan`.
+  - **Fungsi & Properti Modul**: Misalnya `math.sqr` disarankan menjadi `math.sqrt`.
+- **Rekomendasi Modul Otomatis (`ImportError`)**: Ketika Anda memanggil fungsi modul tanpa `use` terlebih dahulu (misal `input()` atau `math.random()`), mesin tidak hanya memberitahu error melainkan menyertakan solusi instan: `💡 Rekomendasi: use io` beserta baris yang perlu ditambahkan.
+- **Zero-Cost Overhead**: Seluruh logika pencarian kemiripan kata dan pemformatan teks hanya berjalan saat terjadi kesalahan (*cold path*). Saat kode berjalan normal, **performa eksekusi EasLang tetap 100% instan dan tidak terbebani sama sekali**.
+
+#### Contoh Tampilan Diagnostik:
+```
+File "game.eas", line 8, col 1
+   8 | whlie selesai == false
+     | ^^^^^
+SyntaxError: Keyword 'whlie' tidak dikenali
+  💡 Rekomendasi: Apakah maksud Anda 'while'?
+
+File "game.eas", line 12, col 4
+  12 | if tebakn < angka
+     |    ^^^^^^
+NameError: Variabel 'tebakn' belum didefinisikan.
+  💡 Rekomendasi: Apakah maksud Anda variabel 'tebakan'?
+
+File "skrip.eas", line 1, col 5
+   1 | x = input("Masukkan angka: ")
+     |     ^^^^^
+ImportError: Modul 'io' belum dimuat. 'input' memerlukan modul 'io'.
+  💡 Rekomendasi: use io
+  💡 Solusi: Tambahkan perintah 'use io' di bagian atas skrip Anda.
+```
+
+---
+
+## 6. Hasil Benchmark & Komparasi Kecepatan
 
 Pengujian performa dilakukan secara langsung di lingkungan Windows 64-bit pada prosesor multi-core dengan membandingkan **EasLang Low-Machine Engine**, **EasLang Standalone Native Binary**, dan **Python 3.14**.
 
@@ -885,7 +923,7 @@ Menguji performa operasi perulangan dan aritmatika intensif berskala besar:
 
 ---
 
-## 6. Panduan Eksekusi & Kompilasi AOT
+## 7. Panduan Eksekusi & Kompilasi AOT (Linux, Android Termux, Windows)
 
 ### 1. Eksekusi Skrip Instan Tanpa Cache (Default CLI Mode)
 Jalankan berkas skrip `.eas` secara langsung. Engine mengeksekusi secara instan di dalam memori tanpa meninggalkan berkas cache di penyimpanan disk (*zero disk cache*):
@@ -898,17 +936,43 @@ eas script.eas
 .\eas.exe script.eas
 ```
 
-### 2. Kompilasi AOT ke Executable Mandiri (`build`)
-Kompilasi skrip `.eas` langsung menjadi binary executable native mandiri yang teroptimasi penuh (`-O3 -flto`) tanpa dependensi runtime:
+### 2. Kompilasi AOT ke Executable Mandiri Multi-Platform (`eas build`)
+Perintah `eas build` mengompilasi skrip `.eas` menjadi binary executable native mandiri (*self-contained*) dengan optimasi C++20 `-O3 -flto`.
 
+Binary yang dihasilkan **100% mandiri** (runtime standard library disematkan langsung di dalam berkas hasil kompilasi), sehingga berkas `.exe` atau binary Linux/Android dapat disalin dan dijalankan di komputer atau perangkat mana saja tanpa memerlukan folder source code EasLang.
+
+#### 🐧 Di Linux:
+Pastikan Anda memiliki compiler C++ (`g++` atau `clang++`):
 ```bash
-# Di Linux & Android (Termux):
-eas build script.eas -o program
-./program
+# Install compiler jika belum ada (Ubuntu/Debian)
+sudo apt update && sudo apt install g++ -y
 
-# Di Windows:
-.\eas.exe build script.eas -o program.exe
-.\program.exe
+# Kompilasi skrip EasLang
+eas build game.eas -o game
+
+# Jalankan langsung
+./game
+```
+
+#### 📱 Di Android (Termux):
+`eas build` dapat berjalan langsung di ponsel Android via Termux menggunakan compiler Clang bawaan Termux:
+```bash
+# Siapkan Clang di Termux (sekali saja)
+pkg update && pkg install clang -y
+
+# Kompilasi skrip EasLang menjadi binary native Android
+eas build game.eas -o game
+
+# Jalankan langsung di Termux
+./game
+```
+> ⚡ **Catatan Android Termux:** Compiler otomatis mendeteksi arsitektur ARM64 dan menggunakan optimasi `-O3 -flto` yang sepenuhnya kompatibel dengan kernel Android.
+
+#### 🪟 Di Windows:
+Menggunakan compiler MinGW-w64 (`g++` atau `clang++`):
+```cmd
+eas build game.eas -o game.exe
+.\game.exe
 ```
 
 ### 3. Mode Interaktif (Interactive REPL)

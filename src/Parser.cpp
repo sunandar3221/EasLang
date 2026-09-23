@@ -1,6 +1,7 @@
 #include "Parser.hpp"
 #include "Lexer.hpp"
 #include "StandardLibrary.hpp"
+#include "Diagnostic.hpp"
 
 Parser::Parser(std::vector<Token> tokens)
     : tokens_(std::move(tokens)), cursor_(0), anonFnCounter_(0) {
@@ -154,15 +155,16 @@ bool Parser::isIndexOrPropAssign() const {
     return hasAccess && (i < tokens_.size() && tokens_[i].type == TokenType::ASSIGN);
 }
 
-void Parser::reportError(const std::string& message, const Token& token) {
-    std::string loc = "[Line " + std::to_string(token.line) + ", Col " + std::to_string(token.column) + "]";
-    if (token.type == TokenType::END_OF_FILE) {
-        errors_.push_back("Syntax Error " + loc + ": " + message + " at end of file.");
-    } else if (token.lexeme.empty()) {
-        errors_.push_back("Syntax Error " + loc + ": " + message + ".");
-    } else {
-        errors_.push_back("Syntax Error " + loc + ": " + message + " near '" + token.lexeme + "'.");
+void Parser::reportError(const std::string& message, const Token& token, const std::string& customRecommendation, const std::string& customHint) {
+    std::string rec = customRecommendation;
+    if (rec.empty() && !token.lexeme.empty()) {
+        std::string sug = Diagnostic::suggestSimilar(token.lexeme, Diagnostic::getKeywords());
+        if (!sug.empty()) {
+            rec = "Apakah maksud Anda '" + sug + "'?";
+        }
     }
+    int len = std::max(1, static_cast<int>(token.lexeme.size()));
+    errors_.push_back(Diagnostic::format("SyntaxError", message, token.line, token.column, len, rec, customHint));
 }
 
 std::unique_ptr<BlockStmt> Parser::parseProgram() {
@@ -231,6 +233,25 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
     skipNewlines();
     if (isAtEnd()) return nullptr;
 
+    if (check(TokenType::IDENTIFIER)) {
+        const Token& curTok = peek();
+        const Token& nextTok = peekNext();
+        if (nextTok.type != TokenType::ASSIGN && nextTok.type != TokenType::DOT && nextTok.type != TokenType::LBRACKET) {
+            if (functionArity_.find(curTok.lexeme) == functionArity_.end()) {
+                std::string match = Diagnostic::suggestSimilar(curTok.lexeme, Diagnostic::getStatementKeywords(), 2);
+                if (!match.empty()) {
+                    reportError("Keyword '" + curTok.lexeme + "' tidak dikenali", curTok, "Apakah maksud Anda '" + match + "'?");
+                    advance();
+                    while (!check(TokenType::NEWLINE) && !check(TokenType::DEDENT) && !isAtEnd()) {
+                        advance();
+                    }
+                    if (check(TokenType::NEWLINE)) advance();
+                    return nullptr;
+                }
+            }
+        }
+    }
+
     switch (peek().type) {
         case TokenType::PRINT: return parsePrint(false);
         case TokenType::SILENT_PRINT: return parsePrint(true);
@@ -248,12 +269,12 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         case TokenType::BREAK: return parseBreak();
         case TokenType::CONTINUE: return parseContinue();
         case TokenType::ELSE: {
-            reportError("Unexpected 'else' without matching 'if'", peek());
+            reportError("Blok 'else' tanpa pasangan 'if'", peek(), "", "Pastikan blok 'else' diawali dengan blok 'if'.");
             advance();
             return nullptr;
         }
         case TokenType::ELIF: {
-            reportError("Unexpected 'elif' without matching 'if'", peek());
+            reportError("Blok 'elif' atau 'elseif' tanpa pasangan 'if'", peek(), "", "Pastikan blok 'elseif'/'elif' didahului dengan 'if'.");
             advance();
             return nullptr;
         }
@@ -912,7 +933,7 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
         }
         skipNewlines();
         if (!match(TokenType::RBRACKET)) {
-            reportError("Expected closing ']'", peek());
+            reportError("Tanda kurung siku penutup ']' diharapkan", peek(), "", "Pastikan menambahkan ']' untuk menutup list.");
         }
         return std::make_unique<ListLiteralExpr>(std::move(elems), line);
     }
@@ -920,7 +941,7 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
     if (match(TokenType::LPAREN)) {
         auto expr = parseExpression();
         if (!match(TokenType::RPAREN)) {
-            reportError("Expected closing ')'", peek());
+            reportError("Tanda kurung penutup ')' diharapkan", peek(), "", "Pastikan menambahkan ')' untuk menutup ekspresi.");
         }
         return expr;
     }
@@ -942,18 +963,23 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
                 } while (match(TokenType::COMMA));
             }
             if (!match(TokenType::RPAREN)) {
-                reportError("Expected closing ')'", peek());
+                reportError("Tanda kurung penutup ')' diharapkan", peek(), "", "Pastikan menambahkan ')' untuk menutup pemanggilan print.");
             }
         }
         return std::make_unique<CallExpr>(silent ? "silent_print" : "print", std::move(args));
     }
 
     if (isAtEnd()) {
-        reportError("Unexpected end of file in expression", peek());
+        reportError("Akhir berkas tidak terduga pada evaluasi ekspresi (unexpected EOF)", peek());
     } else if (check(TokenType::NEWLINE) || check(TokenType::DEDENT) || check(TokenType::END)) {
-        reportError("Expected expression", peek());
+        reportError("Ekspresi diharapkan di sini", peek());
     } else {
-        reportError("Unexpected token in expression", peek());
+        std::string rec = "";
+        std::string sug = Diagnostic::suggestSimilar(peek().lexeme, Diagnostic::getKeywords());
+        if (!sug.empty()) {
+            rec = "Apakah maksud Anda '" + sug + "'?";
+        }
+        reportError("Token tidak terduga dalam ekspresi: '" + peek().lexeme + "'", peek(), rec);
         advance();
     }
     return std::make_unique<LiteralExpr>(Value(), line);

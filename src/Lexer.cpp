@@ -1,4 +1,5 @@
 #include "Lexer.hpp"
+#include "Diagnostic.hpp"
 #include <cctype>
 #include <cstdlib>
 
@@ -173,7 +174,8 @@ Token Lexer::readString() {
     if (!isAtEnd() && peek() == '"') {
         advance();
     } else {
-        errors_.push_back("Syntax Error [Line " + std::to_string(startLine) + ", Col " + std::to_string(startCol) + "]: Unterminated string literal.");
+        int span = std::max(1, static_cast<int>(val.size() + 1));
+        errors_.push_back(Diagnostic::format("SyntaxError", "String literal tidak ditutup (unterminated string literal).", startLine, startCol, span, "", "Pastikan menambahkan tanda kutip penutup '\"' di akhir teks string."));
     }
 
     Token tok(TokenType::STRING, val, startLine, startCol);
@@ -346,7 +348,7 @@ std::vector<Token> Lexer::tokenize() {
             case '}': break;
             default:
                 if (static_cast<unsigned char>(c) >= 32) {
-                    errors_.push_back("Syntax Error [Line " + std::to_string(curLine) + ", Col " + std::to_string(curCol) + "]: Unexpected character '" + std::string(1, c) + "'.");
+                    errors_.push_back(Diagnostic::format("SyntaxError", "Karakter tidak terduga '" + std::string(1, c) + "'.", curLine, curCol, 1));
                 }
                 break;
         }

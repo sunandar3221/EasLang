@@ -1,6 +1,7 @@
 #include "Repl.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Diagnostic.hpp"
 #include <iostream>
 #include <algorithm>
 
@@ -61,6 +62,7 @@ void Repl::run() {
     };
 
     auto executeCode = [this](const std::string& code) {
+        Diagnostic::setSource("<repl>", code);
         try {
             Lexer lexer(code);
             auto tokens = lexer.tokenize();
@@ -94,10 +96,12 @@ void Repl::run() {
             }
         } catch (const std::exception& ex) {
             std::string msg = ex.what();
-            if (msg.rfind("Runtime Error", 0) != 0 && msg.rfind("Syntax Error", 0) != 0) {
-                std::cerr << "Runtime Error: " << msg << "\n";
-            } else {
+            if (msg.find("\x1b[") != std::string::npos || msg.find("───") != std::string::npos ||
+                msg.rfind("File \"", 0) == 0 || msg.find("Error:") != std::string::npos ||
+                msg.rfind("Runtime Error", 0) == 0 || msg.rfind("Syntax Error", 0) == 0) {
                 std::cerr << msg << "\n";
+            } else {
+                std::cerr << "Runtime Error: " << msg << "\n";
             }
         } catch (...) {
             std::cerr << "Runtime Error: Unknown error occurred.\n";

@@ -10,6 +10,7 @@ public:
     AotGenerator();
     std::string generateCpp(BlockStmt* program);
     bool buildBinary(const std::string& sourceFile, const std::string& outputFile);
+    static std::string getRuntimeSource();
 
 private:
     int indentLevel_;

@@ -58,12 +58,14 @@ public:
     std::vector<Value> constants;
     std::vector<Chunk*> cachedChunks;
     std::vector<int> lines;
+    std::vector<int> columns;
+    std::vector<int> lengths;
 
     Chunk(std::string chunkName = "", int fnArity = 0);
 
     size_t addConstant(Value val);
-    void emit(uint8_t byte, int line = 1);
-    void emitOp(OpCode op, int line = 1);
-    void emitShort(uint16_t val, int line = 1);
-    void writeConstant(Value val, int line = 1);
+    void emit(uint8_t byte, int line = 1, int col = 1, int len = 1);
+    void emitOp(OpCode op, int line = 1, int col = 1, int len = 1);
+    void emitShort(uint16_t val, int line = 1, int col = 1, int len = 1);
+    void writeConstant(Value val, int line = 1, int col = 1, int len = 1);
 };

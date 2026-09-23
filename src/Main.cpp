@@ -6,6 +6,7 @@
 #include "AotGenerator.hpp"
 #include "Repl.hpp"
 #include "StandardLibrary.hpp"
+#include "Diagnostic.hpp"
 #include <iostream>
 #include <fstream>
 
@@ -28,12 +29,16 @@ int main(int argc, char* argv[]) {
 
     if (arg1 == "build" || arg1 == "-c" || arg1 == "--compile") {
         if (argc < 3) {
+#ifdef _WIN32
             std::cerr << "Usage: eas build <input.eas> [-o <output.exe>]\n";
+#else
+            std::cerr << "Usage: eas build <input.eas> [-o <output>]\n";
+#endif
             return 1;
         }
 
         std::string inputFile;
-        std::string outputFile = "output.exe";
+        std::string outputFile;
 
         for (int i = 2; i < argc; ++i) {
             std::string arg = argv[i];
@@ -45,8 +50,26 @@ int main(int argc, char* argv[]) {
         }
 
         if (inputFile.empty()) {
+#ifdef _WIN32
             std::cerr << "Usage: eas build <input.eas> [-o <output.exe>]\n";
+#else
+            std::cerr << "Usage: eas build <input.eas> [-o <output>]\n";
+#endif
             return 1;
+        }
+
+        if (outputFile.empty()) {
+            std::string base = inputFile;
+            size_t slash = base.find_last_of("/\\");
+            if (slash != std::string::npos) base = base.substr(slash + 1);
+            if (base.size() > 4 && base.substr(base.size() - 4) == ".eas") {
+                base = base.substr(0, base.size() - 4);
+            }
+#ifdef _WIN32
+            outputFile = base + ".exe";
+#else
+            outputFile = base;
+#endif
         }
 
         Value content = StandardLibrary::readFile(inputFile);
@@ -54,6 +77,8 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error: Could not read file " << inputFile << "\n";
             return 1;
         }
+
+        Diagnostic::setSource(inputFile, content.strVal);
 
         Lexer lexer(content.strVal);
         auto tokens = lexer.tokenize();
@@ -114,6 +139,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    Diagnostic::setSource(scriptPath, content.strVal);
+
     try {
         Lexer lexer(content.strVal);
         auto tokens = lexer.tokenize();
@@ -141,10 +168,12 @@ int main(int argc, char* argv[]) {
         vm.run(mainChunk.get());
     } catch (const std::exception& ex) {
         std::string msg = ex.what();
-        if (msg.rfind("Runtime Error", 0) != 0 && msg.rfind("Syntax Error", 0) != 0) {
-            std::cerr << "Runtime Error: " << msg << "\n";
-        } else {
+        if (msg.find("\x1b[") != std::string::npos || msg.find("───") != std::string::npos ||
+            msg.rfind("File \"", 0) == 0 || msg.find("Error:") != std::string::npos ||
+            msg.rfind("Runtime Error", 0) == 0 || msg.rfind("Syntax Error", 0) == 0) {
             std::cerr << msg << "\n";
+        } else {
+            std::cerr << "Runtime Error: " << msg << "\n";
         }
         return 1;
     }

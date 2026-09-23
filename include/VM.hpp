@@ -21,6 +21,7 @@ public:
     void registerFunction(const std::string& name, std::shared_ptr<Chunk> chunk);
     void registerFunctions(const std::unordered_map<std::string, std::shared_ptr<Chunk>>& fns);
     Value run(Chunk* chunk);
+    void runtimeError(const std::string& errorType, const std::string& message, Chunk* chunk, size_t ip, size_t frameCount, const std::string& recommendation = "", const std::string& hint = "");
     void runtimeError(const std::string& message, Chunk* chunk, size_t ip, size_t frameCount);
     void loadLibrary(const std::string& name);
     bool isLibraryLoaded(const std::string& name) const;

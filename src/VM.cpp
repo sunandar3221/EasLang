@@ -2,6 +2,7 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "BytecodeCompiler.hpp"
+#include "Diagnostic.hpp"
 #include <iostream>
 #include <stdexcept>
 #include <cmath>
@@ -128,22 +129,23 @@ bool VM::isLibraryLoaded(const std::string& name) const {
     return loadedLibraries_.find(name) != loadedLibraries_.end();
 }
 
-void VM::runtimeError(const std::string& message, Chunk* chunk, size_t ip, size_t frameCount) {
-    std::string err = message;
+void VM::runtimeError(const std::string& errorType, const std::string& message, Chunk* chunk, size_t ip, size_t frameCount, const std::string& recommendation, const std::string& hint) {
+    (void)frameCount;
+    int line = 1;
+    int col = 1;
+    int len = 1;
     if (chunk && !chunk->lines.empty()) {
         size_t lineIdx = (ip > 0 && ip - 1 < chunk->lines.size()) ? ip - 1 : 0;
-        int line = chunk->lines[lineIdx];
-        err += "\n  [Line " + std::to_string(line) + "] in " + (chunk->name.empty() ? "script" : chunk->name);
+        line = chunk->lines[lineIdx];
+        if (lineIdx < chunk->columns.size()) col = chunk->columns[lineIdx];
+        if (lineIdx < chunk->lengths.size()) len = chunk->lengths[lineIdx];
     }
-    for (size_t i = frameCount > 1 ? frameCount - 1 : 0; i > 0; --i) {
-        CallFrame& f = frames_[i - 1];
-        if (f.chunk && !f.chunk->lines.empty()) {
-            size_t fLineIdx = (f.ip > 0 && f.ip - 1 < f.chunk->lines.size()) ? f.ip - 1 : 0;
-            int fLine = f.chunk->lines[fLineIdx];
-            err += "\n  [Line " + std::to_string(fLine) + "] in " + (f.chunk->name.empty() ? "script" : f.chunk->name);
-        }
-    }
+    std::string err = Diagnostic::format(errorType, message, line, col, len, recommendation, hint);
     throw std::runtime_error(err);
+}
+
+void VM::runtimeError(const std::string& message, Chunk* chunk, size_t ip, size_t frameCount) {
+    runtimeError("RuntimeError", message, chunk, ip, frameCount);
 }
 
 Value VM::run(Chunk* chunk) {
@@ -183,6 +185,12 @@ Value VM::run(Chunk* chunk) {
     uint8_t* code = curChunk->code.data();
     size_t ip = 0;
     Value* slots = frame->slots;
+
+    auto requireModule = [&](const std::string& modName, const std::string& targetName) {
+        if (!isLibraryLoaded(modName)) {
+            runtimeError("ImportError", "Modul '" + modName + "' belum dimuat. " + (targetName.empty() ? "" : ("'" + targetName + "' ")) + "memerlukan modul '" + modName + "'.", curChunk, ip, frameCount, "use " + modName, "Tambahkan perintah 'use " + modName + "' di bagian atas skrip Anda.");
+        }
+    };
 
     while (true) {
         uint8_t instruction = code[ip++];
@@ -237,21 +245,38 @@ Value VM::run(Chunk* chunk) {
                     } else if (name == "print" || name == "silent_print" || name == "len") {
                         *top++ = Value(ValueType::FUNCTION, name);
                     } else if (name == "io") {
-                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
-                    } else if (name == "input") {
-                        runtimeError("Function 'input' requires library 'io'. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                        runtimeError("ImportError", "Modul 'io' belum dimuat.", curChunk, ip, frameCount, "", "Tambahkan 'use io' atau 'import io' di baris awal berkas.");
+                    } else if (name == "input" || name == "ask") {
+                        runtimeError("ImportError", "Fungsi '" + name + "' memerlukan modul 'io'.", curChunk, ip, frameCount, "", "Tambahkan 'use io' atau 'import io' di baris awal berkas.");
                     } else if (name == "read" || name == "write") {
-                        runtimeError("Function '" + name + "' requires library 'io'. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
+                        runtimeError("ImportError", "Operasi berkas '" + name + "' memerlukan modul 'io'.", curChunk, ip, frameCount, "", "Tambahkan 'use io' atau 'import io' di baris awal berkas.");
                     } else if (name == "math") {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
+                        runtimeError("ImportError", "Modul 'math' belum dimuat.", curChunk, ip, frameCount, "", "Tambahkan 'use math' atau 'import math' di baris awal berkas.");
                     } else if (name == "time") {
-                        runtimeError("Library 'time' is not loaded. Please use 'use time' or 'import time' first.", curChunk, ip, frameCount);
+                        runtimeError("ImportError", "Modul 'time' belum dimuat.", curChunk, ip, frameCount, "", "Tambahkan 'use time' atau 'import time' di baris awal berkas.");
                     } else if (name == "net" || name == "http") {
-                        runtimeError("Library '" + name + "' is not loaded. Please use 'use " + name + "' first.", curChunk, ip, frameCount);
+                        runtimeError("ImportError", "Modul '" + name + "' belum dimuat.", curChunk, ip, frameCount, "", "Tambahkan 'use " + name + "' di baris awal berkas.");
                     } else if (name == "gui") {
-                        runtimeError("Library 'gui' is not loaded. Please use 'use gui' first.", curChunk, ip, frameCount);
+                        runtimeError("ImportError", "Modul 'gui' belum dimuat.", curChunk, ip, frameCount, "", "Tambahkan 'use gui' di baris awal berkas.");
                     } else {
-                        runtimeError("Undefined variable '" + name + "'", curChunk, ip, frameCount);
+                        // Check if it's a keyword typo
+                        std::string kwMatch = Diagnostic::suggestSimilar(name, Diagnostic::getKeywords());
+                        if (!kwMatch.empty()) {
+                            runtimeError("SyntaxError", "Keyword '" + name + "' tidak dikenali.", curChunk, ip, frameCount, "Apakah maksud Anda '" + kwMatch + "'?");
+                        }
+                        // Check if it's a global variable typo
+                        std::vector<std::string> varNames;
+                        for (const auto& g : globals_) varNames.push_back(g.first);
+                        std::string varMatch = Diagnostic::suggestSimilar(name, varNames);
+                        if (!varMatch.empty()) {
+                            runtimeError("NameError", "Variabel '" + name + "' belum didefinisikan.", curChunk, ip, frameCount, "Apakah maksud Anda variabel '" + varMatch + "'?");
+                        }
+                        // Check if it's a builtin function typo
+                        std::string fnMatch = Diagnostic::suggestSimilar(name, Diagnostic::getBuiltinFunctions());
+                        if (!fnMatch.empty()) {
+                            runtimeError("NameError", "Nama '" + name + "' belum didefinisikan.", curChunk, ip, frameCount, "Apakah maksud Anda fungsi '" + fnMatch + "'?");
+                        }
+                        runtimeError("NameError", "Variabel '" + name + "' belum didefinisikan.", curChunk, ip, frameCount);
                     }
                 }
                 break;
@@ -299,7 +324,7 @@ Value VM::run(Chunk* chunk) {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
                 if (b.asFloat() == 0.0) {
-                    runtimeError("Division by zero", curChunk, ip, frameCount);
+                    runtimeError("ZeroDivisionError", "Pembagian dengan angka nol tidak diperbolehkan (division by zero).", curChunk, ip, frameCount);
                 }
                 if (a.type == ValueType::INT && b.type == ValueType::INT && !(a.intVal == INT64_MIN && b.intVal == -1) && (a.intVal % b.intVal == 0)) {
                     a.intVal /= b.intVal;
@@ -313,7 +338,7 @@ Value VM::run(Chunk* chunk) {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
                 if (b.asInt() == 0) {
-                    runtimeError("Modulo by zero", curChunk, ip, frameCount);
+                    runtimeError("ZeroDivisionError", "Operasi modulo dengan angka nol tidak diperbolehkan (modulo by zero).", curChunk, ip, frameCount);
                 }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     if (a.intVal == INT64_MIN && b.intVal == -1) {
@@ -560,9 +585,7 @@ Value VM::run(Chunk* chunk) {
                     top -= argCount;
                     *top++ = StandardLibrary::silentPrint(args);
                 } else if (name == "input" || name == "io.input" || name == "io.ask" || name == "ask") {
-                    if (!isLibraryLoaded("io")) {
-                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("io", name);
                     std::string prompt;
                     if (argCount > 0) {
                         prompt = (*(top - argCount)).toString();
@@ -570,73 +593,51 @@ Value VM::run(Chunk* chunk) {
                     }
                     *top++ = StandardLibrary::input(prompt);
                 } else if (name == "read" || name == "io.read") {
-                    if (!isLibraryLoaded("io")) {
-                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("io", name);
                     Value path = *(--top);
                     *top++ = StandardLibrary::readFile(path.toString());
                 } else if (name == "write" || name == "io.write") {
-                    if (!isLibraryLoaded("io")) {
-                        runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("io", name);
                     Value c = *(--top);
                     Value p = *(--top);
                     *top++ = StandardLibrary::writeFile(p.toString(), c.toString());
                 } else if (name == "math.sqrt") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathSqrt(val);
                 } else if (name == "math.abs") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathAbs(val);
                 } else if (name == "math.pow") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double exp = (*(--top)).asFloat();
                     double base = (*(--top)).asFloat();
                     *top++ = StandardLibrary::mathPow(base, exp);
                 } else if (name == "math.floor") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathFloor(val);
                 } else if (name == "math.ceil") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathCeil(val);
                 } else if (name == "math.round") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathRound(val);
                 } else if (name == "math.min") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double b = (*(--top)).asFloat();
                     double a = (*(--top)).asFloat();
                     *top++ = StandardLibrary::mathMin(a, b);
                 } else if (name == "math.max") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double b = (*(--top)).asFloat();
                     double a = (*(--top)).asFloat();
                     *top++ = StandardLibrary::mathMax(a, b);
                 } else if (name == "math.random" || name == "random") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     if (argCount == 0) {
                         *top++ = StandardLibrary::mathRandom();
                     } else if (argCount == 1) {
@@ -649,9 +650,7 @@ Value VM::run(Chunk* chunk) {
                         *top++ = StandardLibrary::mathRandom(a, b);
                     }
                 } else if (name == "math.random_seed" || name == "math.randomSeed" || name == "math.seed" || name == "random_seed" || name == "seed") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     if (argCount == 0) {
                         *top++ = StandardLibrary::mathRandomSeed();
                     } else {
@@ -660,27 +659,19 @@ Value VM::run(Chunk* chunk) {
                         *top++ = StandardLibrary::mathRandomSeed(s);
                     }
                 } else if (name == "math.sin") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathSin(val);
                 } else if (name == "math.cos") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathCos(val);
                 } else if (name == "math.tan") {
-                    if (!isLibraryLoaded("math")) {
-                        runtimeError("Library 'math' is not loaded. Please use 'use math' or 'import math' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
                     *top++ = StandardLibrary::mathTan(val);
                 } else if (name == "time.sleep") {
-                    if (!isLibraryLoaded("time")) {
-                        runtimeError("Library 'time' is not loaded. Please use 'use time' or 'import time' first.", curChunk, ip, frameCount);
-                    }
+                    requireModule("time", name);
                     int64_t ms = argCount > 0 ? (*(--top)).asInt() : 0;
                     *top++ = StandardLibrary::timeSleep(ms);
                 } else if (name == "time.now") {
@@ -736,7 +727,22 @@ Value VM::run(Chunk* chunk) {
                         ip = 0;
                         slots = nextSlots;
                     } else {
-                        runtimeError("Undefined function '" + name + "'", curChunk, ip, frameCount);
+                        std::vector<std::string> candidates;
+                        for (const auto& fn : functions_) candidates.push_back(fn.first);
+                        for (const auto& b : Diagnostic::getBuiltinFunctions()) candidates.push_back(b);
+                        size_t dotPos = name.find('.');
+                        if (dotPos != std::string::npos) {
+                            std::string mod = name.substr(0, dotPos);
+                            std::string fnName = name.substr(dotPos + 1);
+                            auto modMembers = Diagnostic::getModuleMembers(mod);
+                            std::string memberMatch = Diagnostic::suggestSimilar(fnName, modMembers);
+                            if (!memberMatch.empty()) {
+                                runtimeError("NameError", "Fungsi '" + name + "' tidak ditemukan pada modul '" + mod + "'.", curChunk, ip, frameCount, "Apakah maksud Anda '" + mod + "." + memberMatch + "'?");
+                            }
+                        }
+                        std::string fnMatch = Diagnostic::suggestSimilar(name, candidates);
+                        std::string rec = fnMatch.empty() ? "" : "Apakah maksud Anda '" + fnMatch + "'?";
+                        runtimeError("NameError", "Fungsi '" + name + "' tidak ditemukan.", curChunk, ip, frameCount, rec);
                     }
                 }
                 break;
@@ -777,18 +783,14 @@ Value VM::run(Chunk* chunk) {
                 break;
             }
             case OpCode::OP_WRITE: {
-                if (!isLibraryLoaded("io")) {
-                    runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
-                }
+                requireModule("io", "write");
                 Value content = *(--top);
                 Value path = *(--top);
                 *top++ = StandardLibrary::writeFile(path.toString(), content.toString());
                 break;
             }
             case OpCode::OP_READ: {
-                if (!isLibraryLoaded("io")) {
-                    runtimeError("Library 'io' is not loaded. Please use 'use io' or 'import io' first.", curChunk, ip, frameCount);
-                }
+                requireModule("io", "read");
                 Value path = *(--top);
                 *top++ = StandardLibrary::readFile(path.toString());
                 break;
@@ -816,7 +818,21 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_GET_PROP: {
                 Value prop = *(--top);
                 Value tgt = *(--top);
-                *top++ = tgt.getProperty(prop.toString());
+                std::string propName = prop.toString();
+                if (tgt.isObject()) {
+                    auto it = tgt.objVal->find(propName);
+                    if (it != tgt.objVal->end()) {
+                        *top++ = it->second;
+                    } else {
+                        std::vector<std::string> objProps;
+                        for (const auto& kv : *tgt.objVal) objProps.push_back(kv.first);
+                        std::string sug = Diagnostic::suggestSimilar(propName, objProps);
+                        std::string rec = sug.empty() ? "" : "Apakah maksud Anda '" + sug + "'?";
+                        runtimeError("NameError", "Properti atau fungsi '" + propName + "' tidak ditemukan.", curChunk, ip, frameCount, rec);
+                    }
+                } else {
+                    *top++ = tgt.getProperty(propName);
+                }
                 break;
             }
             case OpCode::OP_SET_PROP: {

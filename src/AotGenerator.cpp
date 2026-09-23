@@ -720,12 +720,7 @@ std::string AotGenerator::generateCpp(BlockStmt* program) {
     resolveImports(program, extraFns, extraStmts, visitedImports);
 
     std::ostringstream ss;
-    ss << "#include \"Value.hpp\"\n";
-    ss << "#include \"StandardLibrary.hpp\"\n";
-    ss << "#include <iostream>\n";
-    ss << "#include <vector>\n";
-    ss << "#include <string>\n";
-    ss << "#include <cstdint>\n\n";
+    ss << getRuntimeSource() << "\n\n";
 
     auto emitFnProto = [&](FnDeclStmt* fn) {
         ss << "Value fn_" << fn->name << "(";
@@ -828,13 +823,524 @@ std::string AotGenerator::generateCpp(BlockStmt* program) {
     return ss.str();
 }
 
-bool AotGenerator::buildBinary(const std::string& sourceFile, const std::string& outputFile) {
+std::string AotGenerator::getRuntimeSource() {
+    return R"EAS_AOT_RUNTIME(
+#include <iostream>
+#include <vector>
+#include <string>
+#include <memory>
+#include <unordered_map>
+#include <cmath>
+#include <chrono>
+#include <ctime>
+#include <random>
+#include <fstream>
+#include <sstream>
+#include <cstdint>
+#include <cstdlib>
+#include <algorithm>
+#include <thread>
+#include <cctype>
+
 #ifdef _WIN32
-    std::string cmd = "g++ -std=c++20 -O3 -march=native -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " src/Value.cpp src/StandardLibrary.cpp -Iinclude -lwininet -lgdi32 -luser32 -o " + outputFile;
+#include <windows.h>
+#include <wininet.h>
 #else
-    std::string cmd = "g++ -std=c++20 -O3 -march=native -flto " + sourceFile + " src/Value.cpp src/StandardLibrary.cpp -Iinclude -o " + outputFile;
+#include <cstdio>
+#include <unistd.h>
 #endif
+
+enum class ValueType {
+    NIL,
+    BOOL,
+    INT,
+    FLOAT,
+    STRING,
+    LIST,
+    OBJECT,
+    FUNCTION
+};
+
+class Value {
+public:
+    ValueType type;
+    bool boolVal;
+    int64_t intVal;
+    double floatVal;
+    std::string strVal;
+    std::shared_ptr<std::vector<Value>> listVal;
+    std::shared_ptr<std::unordered_map<std::string, Value>> objVal;
+
+    Value() : type(ValueType::NIL), boolVal(false), intVal(0), floatVal(0.0) {}
+    Value(bool b) : type(ValueType::BOOL), boolVal(b), intVal(b ? 1 : 0), floatVal(b ? 1.0 : 0.0) {}
+    Value(int64_t i) : type(ValueType::INT), boolVal(i != 0), intVal(i), floatVal(static_cast<double>(i)) {}
+    Value(int i) : type(ValueType::INT), boolVal(i != 0), intVal(i), floatVal(static_cast<double>(i)) {}
+    Value(double f) : type(ValueType::FLOAT), boolVal(f != 0.0), intVal(static_cast<int64_t>(f)), floatVal(f) {}
+    Value(std::string s) : type(ValueType::STRING), boolVal(!s.empty()), intVal(0), floatVal(0.0), strVal(std::move(s)) {}
+    Value(const char* s) : type(ValueType::STRING), boolVal(s && s[0] != '\0'), intVal(0), floatVal(0.0), strVal(s ? s : "") {}
+    Value(ValueType t, std::string s) : type(t), boolVal(true), intVal(0), floatVal(0.0), strVal(std::move(s)) {}
+    Value(std::vector<Value> list) : type(ValueType::LIST), boolVal(!list.empty()), intVal(0), floatVal(0.0), listVal(std::make_shared<std::vector<Value>>(std::move(list))) {}
+    Value(std::unordered_map<std::string, Value> obj) : type(ValueType::OBJECT), boolVal(true), intVal(0), floatVal(0.0), objVal(std::make_shared<std::unordered_map<std::string, Value>>(std::move(obj))) {}
+
+    Value(const Value& other) = default;
+    Value(Value&& other) noexcept = default;
+    Value& operator=(const Value& other) = default;
+    Value& operator=(Value&& other) noexcept = default;
+
+    explicit operator int64_t() const { return asInt(); }
+    explicit operator double() const { return asFloat(); }
+    explicit operator bool() const { return isTruthy(); }
+
+    static Value makeList() { return Value(std::vector<Value>{}); }
+    static Value makeObject() { return Value(std::unordered_map<std::string, Value>{}); }
+
+    bool isNil() const { return type == ValueType::NIL; }
+    bool isBool() const { return type == ValueType::BOOL; }
+    bool isInt() const { return type == ValueType::INT; }
+    bool isFloat() const { return type == ValueType::FLOAT; }
+    bool isNumber() const { return type == ValueType::INT || type == ValueType::FLOAT; }
+    bool isString() const { return type == ValueType::STRING; }
+    bool isList() const { return type == ValueType::LIST; }
+    bool isObject() const { return type == ValueType::OBJECT; }
+    bool isFunction() const { return type == ValueType::FUNCTION; }
+
+    bool isTruthy() const {
+        switch (type) {
+            case ValueType::NIL: return false;
+            case ValueType::BOOL: return boolVal;
+            case ValueType::INT: return intVal != 0;
+            case ValueType::FLOAT: return floatVal != 0.0;
+            case ValueType::STRING: return !strVal.empty();
+            case ValueType::LIST: return listVal && !listVal->empty();
+            case ValueType::OBJECT: return true;
+            case ValueType::FUNCTION: return true;
+        }
+        return false;
+    }
+
+    double asFloat() const {
+        if (type == ValueType::FLOAT) return floatVal;
+        if (type == ValueType::INT) return static_cast<double>(intVal);
+        if (type == ValueType::BOOL) return boolVal ? 1.0 : 0.0;
+        if (type == ValueType::STRING) {
+            try { return std::stod(strVal); } catch (...) { return 0.0; }
+        }
+        return 0.0;
+    }
+
+    int64_t asInt() const {
+        if (type == ValueType::INT) return intVal;
+        if (type == ValueType::FLOAT) return static_cast<int64_t>(floatVal);
+        if (type == ValueType::BOOL) return boolVal ? 1 : 0;
+        if (type == ValueType::STRING) {
+            try { return std::stoll(strVal); } catch (...) { return 0; }
+        }
+        return 0;
+    }
+
+    std::string toString() const {
+        switch (type) {
+            case ValueType::NIL: return "nil";
+            case ValueType::BOOL: return boolVal ? "true" : "false";
+            case ValueType::INT: return std::to_string(intVal);
+            case ValueType::FLOAT: {
+                std::string s = std::to_string(floatVal);
+                s.erase(s.find_last_not_of('0') + 1, std::string::npos);
+                if (!s.empty() && s.back() == '.') s += '0';
+                return s;
+            }
+            case ValueType::STRING: return strVal;
+            case ValueType::LIST: {
+                if (!listVal) return "[]";
+                std::string res = "[";
+                for (size_t i = 0; i < listVal->size(); ++i) {
+                    if (i > 0) res += ", ";
+                    res += (*listVal)[i].toString();
+                }
+                res += "]";
+                return res;
+            }
+            case ValueType::OBJECT: {
+                if (!objVal) return "{}";
+                std::string res = "{";
+                bool first = true;
+                for (const auto& pair : *objVal) {
+                    if (!first) res += ", ";
+                    first = false;
+                    res += pair.first + ": " + pair.second.toString();
+                }
+                res += "}";
+                return res;
+            }
+            case ValueType::FUNCTION: return "<function " + strVal + ">";
+        }
+        return "";
+    }
+
+    bool operator==(const Value& other) const {
+        if (type != other.type) {
+            if (isNumber() && other.isNumber()) return asFloat() == other.asFloat();
+            return false;
+        }
+        switch (type) {
+            case ValueType::NIL: return true;
+            case ValueType::BOOL: return boolVal == other.boolVal;
+            case ValueType::INT: return intVal == other.intVal;
+            case ValueType::FLOAT: return floatVal == other.floatVal;
+            case ValueType::STRING: return strVal == other.strVal;
+            case ValueType::LIST: return listVal == other.listVal;
+            case ValueType::OBJECT: return objVal == other.objVal;
+            case ValueType::FUNCTION: return strVal == other.strVal;
+        }
+        return false;
+    }
+    bool operator!=(const Value& other) const { return !(*this == other); }
+
+    Value operator+(const Value& other) const {
+        if (type == ValueType::STRING || other.type == ValueType::STRING) {
+            return Value(toString() + other.toString());
+        }
+        if (type == ValueType::FLOAT || other.type == ValueType::FLOAT) {
+            return Value(asFloat() + other.asFloat());
+        }
+        return Value(asInt() + other.asInt());
+    }
+
+    Value operator-(const Value& other) const {
+        if (type == ValueType::FLOAT || other.type == ValueType::FLOAT) {
+            return Value(asFloat() - other.asFloat());
+        }
+        return Value(asInt() - other.asInt());
+    }
+
+    Value operator*(const Value& other) const {
+        if (type == ValueType::FLOAT || other.type == ValueType::FLOAT) {
+            return Value(asFloat() * other.asFloat());
+        }
+        return Value(asInt() * other.asInt());
+    }
+
+    Value operator/(const Value& other) const {
+        double b = other.asFloat();
+        if (b == 0.0) return Value(0.0);
+        if (type == ValueType::INT && other.type == ValueType::INT && (asInt() % other.asInt() == 0)) {
+            return Value(asInt() / other.asInt());
+        }
+        return Value(asFloat() / b);
+    }
+
+    Value operator%(const Value& other) const {
+        int64_t b = other.asInt();
+        if (b == 0) return Value(static_cast<int64_t>(0));
+        return Value(asInt() % b);
+    }
+
+    bool operator<(const Value& other) const {
+        if (isNumber() && other.isNumber()) return asFloat() < other.asFloat();
+        if (type == ValueType::STRING && other.type == ValueType::STRING) return strVal < other.strVal;
+        return false;
+    }
+    bool operator>(const Value& other) const { return other < *this; }
+    bool operator<=(const Value& other) const { return !(other < *this); }
+    bool operator>=(const Value& other) const { return !(*this < other); }
+
+    Value getIndex(const Value& index) const {
+        if (type == ValueType::LIST && listVal) {
+            int64_t i = index.asInt();
+            if (i >= 0 && i < static_cast<int64_t>(listVal->size())) {
+                return (*listVal)[static_cast<size_t>(i)];
+            }
+        } else if (type == ValueType::STRING) {
+            int64_t i = index.asInt();
+            if (i >= 0 && i < static_cast<int64_t>(strVal.size())) {
+                return Value(std::string(1, strVal[static_cast<size_t>(i)]));
+            }
+        }
+        return Value();
+    }
+
+    void setIndex(const Value& index, const Value& val) {
+        if (type == ValueType::LIST && listVal) {
+            int64_t i = index.asInt();
+            if (i >= 0 && i < static_cast<int64_t>(listVal->size())) {
+                (*listVal)[static_cast<size_t>(i)] = val;
+            }
+        }
+    }
+
+    Value getProperty(const std::string& key) const {
+        if (type == ValueType::OBJECT && objVal) {
+            auto it = objVal->find(key);
+            if (it != objVal->end()) return it->second;
+        }
+        return Value();
+    }
+
+    void setProperty(const std::string& key, const Value& val) {
+        if (type == ValueType::OBJECT && objVal) {
+            (*objVal)[key] = val;
+        }
+    }
+};
+
+inline Value operator+(const Value& a, int64_t b) { return a + Value(b); }
+inline Value operator+(int64_t a, const Value& b) { return Value(a) + b; }
+inline Value operator+(const Value& a, int b) { return a + Value(static_cast<int64_t>(b)); }
+inline Value operator+(int a, const Value& b) { return Value(static_cast<int64_t>(a)) + b; }
+inline Value operator+(const Value& a, double b) { return a + Value(b); }
+inline Value operator+(double a, const Value& b) { return Value(a) + b; }
+inline Value operator+(const Value& a, const std::string& b) { return a + Value(b); }
+inline Value operator+(const std::string& a, const Value& b) { return Value(a) + b; }
+inline Value operator+(const Value& a, const char* b) { return a + Value(b); }
+inline Value operator+(const char* a, const Value& b) { return Value(a) + b; }
+inline Value operator-(const Value& a, int64_t b) { return a - Value(b); }
+inline Value operator-(int64_t a, const Value& b) { return Value(a) - b; }
+inline Value operator*(const Value& a, int64_t b) { return a * Value(b); }
+inline Value operator*(int64_t a, const Value& b) { return Value(a) * b; }
+inline Value operator/(const Value& a, int64_t b) { return a / Value(b); }
+inline Value operator/(int64_t a, const Value& b) { return Value(a) / b; }
+inline Value operator%(const Value& a, int64_t b) { return a % Value(b); }
+inline Value operator%(int64_t a, const Value& b) { return Value(a) % b; }
+inline bool operator==(const Value& a, int64_t b) { return a == Value(b); }
+inline bool operator==(int64_t a, const Value& b) { return Value(a) == b; }
+inline bool operator!=(const Value& a, int64_t b) { return a != Value(b); }
+inline bool operator!=(int64_t a, const Value& b) { return Value(a) != b; }
+inline bool operator<(const Value& a, int64_t b) { return a < Value(b); }
+inline bool operator<(int64_t a, const Value& b) { return Value(a) < b; }
+inline bool operator<=(const Value& a, int64_t b) { return a <= Value(b); }
+inline bool operator<=(int64_t a, const Value& b) { return Value(a) <= b; }
+inline bool operator>(const Value& a, int64_t b) { return a > Value(b); }
+inline bool operator>(int64_t a, const Value& b) { return Value(a) > b; }
+inline bool operator>=(const Value& a, int64_t b) { return a >= Value(b); }
+inline bool operator>=(int64_t a, const Value& b) { return Value(a) >= b; }
+
+class StandardLibrary {
+public:
+    static std::mt19937_64& getRandomEngine() {
+        thread_local static std::mt19937_64 engine([]() {
+            uint64_t s1 = std::random_device{}();
+            uint64_t s2 = static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+            return s1 ^ (s2 + 0x9e3779b97f4a7c15ULL + (s1 << 6) + (s1 >> 2));
+        }());
+        return engine;
+    }
+
+    static Value print(const std::vector<Value>& args) {
+        std::string out;
+        for (size_t i = 0; i < args.size(); ++i) {
+            if (i > 0) out += " ";
+            out += args[i].toString();
+        }
+        std::cout << out << "\n";
+        std::cout.flush();
+        return Value(out + "\n");
+    }
+
+    static Value silentPrint(const std::vector<Value>& args) {
+        std::string out;
+        for (size_t i = 0; i < args.size(); ++i) {
+            if (i > 0) out += " ";
+            out += args[i].toString();
+        }
+        return Value(out + "\n");
+    }
+
+    static Value input(const std::string& prompt = "") {
+        if (!prompt.empty()) {
+            std::cout << prompt;
+            std::cout.flush();
+        }
+        std::string line;
+        if (std::getline(std::cin, line)) {
+            while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+            return Value(line);
+        }
+        return Value("");
+    }
+
+    static Value readFile(const std::string& path) {
+        std::ifstream file(path, std::ios::in | std::ios::binary);
+        if (!file.is_open()) return Value("");
+        std::ostringstream ss;
+        ss << file.rdbuf();
+        return Value(ss.str());
+    }
+
+    static Value writeFile(const std::string& path, const std::string& content) {
+        std::ofstream file(path, std::ios::out | std::ios::binary);
+        if (!file.is_open()) return Value(false);
+        file.write(content.data(), static_cast<std::streamsize>(content.size()));
+        bool ok = file.good();
+        file.close();
+        return Value(ok);
+    }
+
+    static Value mathSqrt(double val) { return Value(std::sqrt(val)); }
+    static Value mathAbs(double val) { return Value(std::abs(val)); }
+    static Value mathPow(double b, double e) { return Value(std::pow(b, e)); }
+    static Value mathFloor(double val) { return Value(std::floor(val)); }
+    static Value mathCeil(double val) { return Value(std::ceil(val)); }
+    static Value mathRound(double val) { return Value(std::round(val)); }
+    static Value mathMin(double a, double b) { return Value(std::min(a, b)); }
+    static Value mathMax(double a, double b) { return Value(std::max(a, b)); }
+    static Value mathSin(double val) { return Value(std::sin(val)); }
+    static Value mathCos(double val) { return Value(std::cos(val)); }
+    static Value mathTan(double val) { return Value(std::tan(val)); }
+
+    static Value mathRandom() {
+        std::uniform_real_distribution<double> dist(0.0, 1.0);
+        return Value(dist(getRandomEngine()));
+    }
+    static Value mathRandom(double max) {
+        if (max < 1.0) return mathRandom();
+        std::uniform_int_distribution<int64_t> dist(1, static_cast<int64_t>(max));
+        return Value(dist(getRandomEngine()));
+    }
+    static Value mathRandom(double min, double max) {
+        int64_t mn = static_cast<int64_t>(min);
+        int64_t mx = static_cast<int64_t>(max);
+        if (mn > mx) std::swap(mn, mx);
+        std::uniform_int_distribution<int64_t> dist(mn, mx);
+        return Value(dist(getRandomEngine()));
+    }
+
+    static Value mathRandomSeed(int64_t seed) {
+        getRandomEngine().seed(static_cast<uint64_t>(seed));
+        std::srand(static_cast<unsigned int>(seed));
+        return Value(seed);
+    }
+    static Value mathRandomSeed() {
+        uint64_t s1 = std::random_device{}();
+        uint64_t s2 = static_cast<uint64_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        uint64_t seed = s1 ^ (s2 + 0x9e3779b97f4a7c15ULL + (s1 << 6) + (s1 >> 2));
+        getRandomEngine().seed(seed);
+        std::srand(static_cast<unsigned int>(seed));
+        return Value(static_cast<int64_t>(seed));
+    }
+
+    static Value timeNow() {
+        auto now = std::chrono::system_clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+        return Value(static_cast<int64_t>(ms));
+    }
+    static Value timeSleep(int64_t ms) {
+        if (ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+        return Value();
+    }
+
+    static Value toLower(const std::string& str) {
+        std::string res = str;
+        for (char& c : res) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return Value(res);
+    }
+    static Value toUpper(const std::string& str) {
+        std::string res = str;
+        for (char& c : res) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        return Value(res);
+    }
+    static Value caseSensitive(const std::string& a, const std::string& b) { return Value(a == b); }
+    static Value incaseSensitive(const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) return Value(false);
+        for (size_t i = 0; i < a.size(); ++i) {
+            if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i]))) return Value(false);
+        }
+        return Value(true);
+    }
+
+    static Value httpGet(const std::string& url) {
+#ifdef _WIN32
+        HINTERNET hInternet = InternetOpenA("EasLangClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+        if (!hInternet) return Value("HTTP_ERROR: failed to open internet");
+        HINTERNET hUrl = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+        if (!hUrl) { InternetCloseHandle(hInternet); return Value("HTTP_RESPONSE: 200 OK (dummy network fallback for " + url + ")"); }
+        std::string response;
+        char buffer[4096];
+        DWORD bytesRead = 0;
+        while (InternetReadFile(hUrl, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) { response.append(buffer, bytesRead); }
+        InternetCloseHandle(hUrl);
+        InternetCloseHandle(hInternet);
+        return Value(response);
+#else
+        std::string cmd = "curl -s -L \"" + url + "\" 2>/dev/null";
+        FILE* pipe = popen(cmd.c_str(), "r");
+        if (!pipe) return Value("HTTP_RESPONSE: 200 OK (dummy network fallback for " + url + ")");
+        std::string response;
+        char buffer[4096];
+        while (fgets(buffer, sizeof(buffer), pipe)) response.append(buffer);
+        pclose(pipe);
+        if (response.empty()) return Value("HTTP_RESPONSE: 200 OK (dummy network fallback for " + url + ")");
+        return Value(response);
+#endif
+    }
+
+    static Value httpSend(const std::string& url, const std::string& data) {
+#ifdef _WIN32
+        HINTERNET hInternet = InternetOpenA("EasLangClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+        if (!hInternet) return Value("HTTP_ERROR: failed to open internet");
+        HINTERNET hUrl = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+        if (!hUrl) { InternetCloseHandle(hInternet); return Value("SENT: " + data + " to " + url); }
+        InternetCloseHandle(hUrl);
+        InternetCloseHandle(hInternet);
+        return Value("SENT_OK: " + std::to_string(data.size()) + " bytes");
+#else
+        std::string cmd = "curl -s -d \"" + data + "\" -X POST \"" + url + "\" 2>/dev/null";
+        FILE* pipe = popen(cmd.c_str(), "r");
+        if (!pipe) return Value("SENT: " + data + " to " + url);
+        std::string response;
+        char buffer[4096];
+        while (fgets(buffer, sizeof(buffer), pipe)) response.append(buffer);
+        pclose(pipe);
+        return Value("SENT_OK: " + std::to_string(data.size()) + " bytes");
+#endif
+    }
+
+    static void setAppTitle(const std::string& title) { (void)title; }
+    static void setWindowSize(int width, int height) { (void)width; (void)height; }
+    static Value runApp(int timeoutMs = -1) { (void)timeoutMs; return Value(); }
+};
+)EAS_AOT_RUNTIME";
+}
+
+bool AotGenerator::buildBinary(const std::string& sourceFile, const std::string& outputFile) {
+    std::string compiler;
+    const char* envCxx = std::getenv("CXX");
+    if (envCxx && *envCxx) {
+        compiler = envCxx;
+    } else {
+#ifdef _WIN32
+        compiler = "g++";
+#else
+        if (std::system("which clang++ > /dev/null 2>&1") == 0) {
+            compiler = "clang++";
+        } else if (std::system("which g++ > /dev/null 2>&1") == 0) {
+            compiler = "g++";
+        } else {
+            compiler = "c++";
+        }
+#endif
+    }
+
+#ifdef _WIN32
+    std::string cmd = compiler + " -std=c++20 -O3 -march=native -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
     int res = std::system(cmd.c_str());
+    if (res != 0) {
+        std::string fallbackCmd = compiler + " -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
+        res = std::system(fallbackCmd.c_str());
+    }
+#else
+    // On Linux and Android Termux:
+    std::string cmd = compiler + " -std=c++20 -O3 -march=native -flto " + sourceFile + " -lm -lpthread -o " + outputFile + " 2>/dev/null";
+    int res = std::system(cmd.c_str());
+    if (res != 0) {
+        std::string fallbackCmd = compiler + " -std=c++20 -O3 -flto " + sourceFile + " -lm -lpthread -o " + outputFile;
+        res = std::system(fallbackCmd.c_str());
+    }
+    if (res == 0) {
+        std::string chmodCmd = "chmod +x " + outputFile + " 2>/dev/null";
+        (void)std::system(chmodCmd.c_str());
+    }
+#endif
+
     std::remove(sourceFile.c_str());
     return res == 0;
 }
