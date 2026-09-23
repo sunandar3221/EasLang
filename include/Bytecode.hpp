@@ -66,6 +66,7 @@ public:
     std::vector<uint8_t> code;
     std::vector<Value> constants;
     std::vector<Chunk*> cachedChunks;
+    std::unordered_map<std::string, int> localIndices;
     std::vector<int> lines;
     std::vector<int> columns;
     std::vector<int> lengths;

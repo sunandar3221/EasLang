@@ -553,6 +553,40 @@ Value Interpreter::evaluate(Expr* expr) {
             return Value();
         }
 
+        if (name == "append" || name == "io.append") {
+            if (!isLibraryLoaded("io")) {
+                throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+            }
+            if (call->arguments.size() >= 2) {
+                return StandardLibrary::appendFile(evaluate(call->arguments[0].get()).toString(), evaluate(call->arguments[1].get()).toString());
+            }
+            return Value();
+        }
+
+        if (name == "write_lines" || name == "io.write_lines") {
+            if (!isLibraryLoaded("io")) {
+                throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+            }
+            if (call->arguments.size() >= 2) {
+                return StandardLibrary::writeLines(evaluate(call->arguments[0].get()).toString(), evaluate(call->arguments[1].get()));
+            }
+            return Value();
+        }
+
+        if (name == "open" || name == "io.open") {
+            if (!isLibraryLoaded("io")) {
+                throw std::runtime_error("Library 'io' is not loaded. Please use 'use io' or 'import io' first.");
+            }
+            std::string mode = "w";
+            if (call->arguments.size() >= 2) {
+                mode = evaluate(call->arguments[1].get()).toString();
+            }
+            if (!call->arguments.empty()) {
+                return StandardLibrary::openFile(evaluate(call->arguments[0].get()).toString(), mode);
+            }
+            return Value();
+        }
+
         if (name == "math.sqrt") {
             if (!isLibraryLoaded("math")) {
                 throw std::runtime_error("Library 'math' is not loaded. Please use 'use math' or 'import math' first.");
@@ -727,6 +761,30 @@ Value Interpreter::evaluate(Expr* expr) {
                 return executeBlock(fnDef.body.get(), callEnv);
             } catch (const ReturnException& ret) {
                 return ret.value;
+            }
+        }
+
+        size_t dotPos = name.find('.');
+        if (dotPos != std::string::npos) {
+            std::string varName = name.substr(0, dotPos);
+            std::string method = name.substr(dotPos + 1);
+            Value tgt;
+            if (currentEnv_->get(varName, tgt) && tgt.isObject() && tgt.objVal) {
+                auto hIt = tgt.objVal->find("__handle");
+                if (hIt != tgt.objVal->end()) {
+                    int64_t handleId = hIt->second.asInt();
+                    if (method == "write") {
+                        std::string text = !call->arguments.empty() ? evaluate(call->arguments[0].get()).toString() : "";
+                        return StandardLibrary::fileWrite(handleId, text);
+                    } else if (method == "writeline" || method == "write_line") {
+                        std::string text = !call->arguments.empty() ? evaluate(call->arguments[0].get()).toString() : "";
+                        return StandardLibrary::fileWriteLine(handleId, text);
+                    } else if (method == "flush") {
+                        return StandardLibrary::fileFlush(handleId);
+                    } else if (method == "close") {
+                        return StandardLibrary::fileClose(handleId);
+                    }
+                }
             }
         }
 

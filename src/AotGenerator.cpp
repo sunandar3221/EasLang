@@ -195,6 +195,18 @@ std::string AotGenerator::generateExpr(Expr* expr) {
         if ((callee == "write" || callee == "io.write") && call->arguments.size() >= 2) {
             return "StandardLibrary::writeFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
         }
+        if ((callee == "append" || callee == "io.append") && call->arguments.size() >= 2) {
+            return "StandardLibrary::appendFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
+        }
+        if ((callee == "write_lines" || callee == "io.write_lines") && call->arguments.size() >= 2) {
+            return "StandardLibrary::writeLines((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), Value(" + generateExpr(call->arguments[1].get()) + "))";
+        }
+        if (callee == "open" || callee == "io.open") {
+            std::string mode = call->arguments.size() >= 2 ? "(Value(" + generateExpr(call->arguments[1].get()) + ")).toString()" : "\"w\"";
+            if (!call->arguments.empty()) {
+                return "StandardLibrary::openFile((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), " + mode + ")";
+            }
+        }
         if (callee == "io.print") {
             std::string p = "StandardLibrary::print(std::vector<Value>{";
             for (size_t i = 0; i < call->arguments.size(); ++i) {
@@ -358,6 +370,26 @@ std::string AotGenerator::generateExpr(Expr* expr) {
                 return "StandardLibrary::caseSensitive((Value(" + generateExpr(call->arguments[0].get()) + ")).toString(), (Value(" + generateExpr(call->arguments[1].get()) + ")).toString())";
             }
             return "Value(false)";
+        }
+
+        size_t dotPos = callee.find('.');
+        if (dotPos != std::string::npos) {
+            std::string varName = "var_" + callee.substr(0, dotPos);
+            std::string method = callee.substr(dotPos + 1);
+            if (method == "write") {
+                std::string arg = !call->arguments.empty() ? "(Value(" + generateExpr(call->arguments[0].get()) + ")).toString()" : "\"\"";
+                return "([&](){ auto _tgt = " + varName + "; if (_tgt.isObject() && _tgt.objVal) { auto _h = _tgt.objVal->find(\"__handle\"); if (_h != _tgt.objVal->end()) return StandardLibrary::fileWrite(_h->second.asInt(), " + arg + "); } return Value(false); })()";
+            }
+            if (method == "writeline" || method == "write_line") {
+                std::string arg = !call->arguments.empty() ? "(Value(" + generateExpr(call->arguments[0].get()) + ")).toString()" : "\"\"";
+                return "([&](){ auto _tgt = " + varName + "; if (_tgt.isObject() && _tgt.objVal) { auto _h = _tgt.objVal->find(\"__handle\"); if (_h != _tgt.objVal->end()) return StandardLibrary::fileWriteLine(_h->second.asInt(), " + arg + "); } return Value(false); })()";
+            }
+            if (method == "flush") {
+                return "([&](){ auto _tgt = " + varName + "; if (_tgt.isObject() && _tgt.objVal) { auto _h = _tgt.objVal->find(\"__handle\"); if (_h != _tgt.objVal->end()) return StandardLibrary::fileFlush(_h->second.asInt()); } return Value(false); })()";
+            }
+            if (method == "close") {
+                return "([&](){ auto _tgt = " + varName + "; if (_tgt.isObject() && _tgt.objVal) { auto _h = _tgt.objVal->find(\"__handle\"); if (_h != _tgt.objVal->end()) return StandardLibrary::fileClose(_h->second.asInt()); } return Value(false); })()";
+            }
         }
 
         std::string s = "fn_" + callee + "(";
@@ -1177,20 +1209,107 @@ public:
     }
 
     static Value readFile(const std::string& path) {
-        std::ifstream file(path, std::ios::in | std::ios::binary);
-        if (!file.is_open()) return Value("");
-        std::ostringstream ss;
-        ss << file.rdbuf();
-        return Value(ss.str());
+        FILE* fp = fopen(path.c_str(), "rb");
+        if (!fp) return Value("");
+        fseek(fp, 0, SEEK_END);
+        long sz = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        if (sz <= 0) { fclose(fp); return Value(""); }
+        std::string res;
+        res.resize(static_cast<size_t>(sz));
+        size_t readBytes = fread(&res[0], 1, static_cast<size_t>(sz), fp);
+        fclose(fp);
+        if (readBytes < static_cast<size_t>(sz)) res.resize(readBytes);
+        return Value(std::move(res));
     }
 
     static Value writeFile(const std::string& path, const std::string& content) {
-        std::ofstream file(path, std::ios::out | std::ios::binary);
-        if (!file.is_open()) return Value(false);
-        file.write(content.data(), static_cast<std::streamsize>(content.size()));
-        bool ok = file.good();
-        file.close();
-        return Value(ok);
+        FILE* fp = fopen(path.c_str(), "wb");
+        if (!fp) return Value(false);
+        setvbuf(fp, NULL, _IOFBF, 262144);
+        size_t written = fwrite(content.data(), 1, content.size(), fp);
+        fclose(fp);
+        return Value(written == content.size());
+    }
+
+    static Value appendFile(const std::string& path, const std::string& content) {
+        FILE* fp = fopen(path.c_str(), "ab");
+        if (!fp) return Value(false);
+        setvbuf(fp, NULL, _IOFBF, 262144);
+        size_t written = fwrite(content.data(), 1, content.size(), fp);
+        fclose(fp);
+        return Value(written == content.size());
+    }
+
+    static Value writeLines(const std::string& path, const Value& listVal) {
+        if (!listVal.isList() || !listVal.listVal) return Value(false);
+        FILE* fp = fopen(path.c_str(), "wb");
+        if (!fp) return Value(false);
+        setvbuf(fp, NULL, _IOFBF, 262144);
+        for (const auto& item : *listVal.listVal) {
+            std::string s = item.toString();
+            if (!s.empty()) fwrite(s.data(), 1, s.size(), fp);
+            fputc('\n', fp);
+        }
+        fclose(fp);
+        return Value(true);
+    }
+
+    static std::unordered_map<int64_t, FILE*>& getAotFiles() {
+        static std::unordered_map<int64_t, FILE*> s_files;
+        return s_files;
+    }
+
+    static Value openFile(const std::string& path, const std::string& mode) {
+        std::string actualMode = mode.empty() ? "w" : mode;
+        if (actualMode.find('b') == std::string::npos && actualMode.find('+') == std::string::npos) actualMode += "b";
+        FILE* fp = fopen(path.c_str(), actualMode.c_str());
+        if (!fp) return Value();
+        static int64_t s_id = 1;
+        int64_t hid = s_id++;
+        setvbuf(fp, NULL, _IOFBF, 262144);
+        getAotFiles()[hid] = fp;
+
+        Value obj = Value::makeObject();
+        obj.setProperty("__handle", Value(hid));
+        obj.setProperty("path", Value(path));
+        obj.setProperty("mode", Value(mode));
+        obj.setProperty("is_open", Value(true));
+        return obj;
+    }
+
+    static Value fileWrite(int64_t handleId, const std::string& content) {
+        auto& files = getAotFiles();
+        auto it = files.find(handleId);
+        if (it == files.end() || !it->second) return Value(false);
+        size_t written = fwrite(content.data(), 1, content.size(), it->second);
+        return Value(written == content.size());
+    }
+
+    static Value fileWriteLine(int64_t handleId, const std::string& line) {
+        auto& files = getAotFiles();
+        auto it = files.find(handleId);
+        if (it == files.end() || !it->second) return Value(false);
+        if (!line.empty()) fwrite(line.data(), 1, line.size(), it->second);
+        fputc('\n', it->second);
+        return Value(true);
+    }
+
+    static Value fileFlush(int64_t handleId) {
+        auto& files = getAotFiles();
+        auto it = files.find(handleId);
+        if (it == files.end() || !it->second) return Value(false);
+        fflush(it->second);
+        return Value(true);
+    }
+
+    static Value fileClose(int64_t handleId) {
+        auto& files = getAotFiles();
+        auto it = files.find(handleId);
+        if (it == files.end() || !it->second) return Value(false);
+        fclose(it->second);
+        files.erase(it);
+        return Value(true);
     }
 
     static Value toInt(const Value& val) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO="sunandar3221/EasLang"
+REPO="sunandar3221/Fasthon"
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 
@@ -26,17 +26,17 @@ fi
 if [ "$IS_TERMUX" -eq 1 ]; then
   BIN_DIR="$PREFIX/bin"
   if [ "$ARCH_TAG" = "arm64" ]; then
-    ASSET_NAME="eas-android-arm64"
+    ASSET_NAME="fasthon-android-arm64"
   else
-    ASSET_NAME="eas-linux-x64-static"
+    ASSET_NAME="fasthon-linux-x64-static"
   fi
 else
   BIN_DIR="/usr/local/bin"
   if [ "$OS" = "linux" ]; then
     if [ "$ARCH_TAG" = "x64" ]; then
-      ASSET_NAME="eas-linux-x64"
+      ASSET_NAME="fasthon-linux-x64"
     else
-      ASSET_NAME="eas-linux-arm64-static"
+      ASSET_NAME="fasthon-linux-arm64-static"
     fi
   else
     echo "Unsupported operating system: $OS"

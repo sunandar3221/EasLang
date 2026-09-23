@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <algorithm>
 #include <random>
+#include <cstdio>
+#include <mutex>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -78,25 +80,145 @@ Value StandardLibrary::input(const std::string& prompt) {
     return Value("");
 }
 
+struct ManagedFileHandle {
+    FILE* fp = nullptr;
+    std::vector<char> buffer;
+};
+
+static std::unordered_map<int64_t, ManagedFileHandle> g_managedFiles;
+static int64_t g_nextManagedFileId = 1;
+static std::mutex g_managedFileMutex;
+
 Value StandardLibrary::readFile(const std::string& path) {
-    std::ifstream file(path, std::ios::in | std::ios::binary);
-    if (!file.is_open()) {
+    FILE* fp = fopen(path.c_str(), "rb");
+    if (!fp) {
         return Value("");
     }
-    std::ostringstream ss;
-    ss << file.rdbuf();
-    return Value(ss.str());
+    fseek(fp, 0, SEEK_END);
+    long sz = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (sz <= 0) {
+        fclose(fp);
+        return Value("");
+    }
+    std::string res;
+    res.resize(static_cast<size_t>(sz));
+    size_t readBytes = fread(&res[0], 1, static_cast<size_t>(sz), fp);
+    fclose(fp);
+    if (readBytes < static_cast<size_t>(sz)) {
+        res.resize(readBytes);
+    }
+    return Value(std::move(res));
 }
 
 Value StandardLibrary::writeFile(const std::string& path, const std::string& content) {
-    std::ofstream file(path, std::ios::out | std::ios::binary);
-    if (!file.is_open()) {
+    FILE* fp = fopen(path.c_str(), "wb");
+    if (!fp) {
         return Value(false);
     }
-    file.write(content.data(), static_cast<std::streamsize>(content.size()));
-    bool ok = file.good();
-    file.close();
-    return Value(ok);
+    setvbuf(fp, NULL, _IOFBF, 262144);
+    size_t written = fwrite(content.data(), 1, content.size(), fp);
+    fclose(fp);
+    return Value(written == content.size());
+}
+
+Value StandardLibrary::appendFile(const std::string& path, const std::string& content) {
+    FILE* fp = fopen(path.c_str(), "ab");
+    if (!fp) {
+        return Value(false);
+    }
+    setvbuf(fp, NULL, _IOFBF, 262144);
+    size_t written = fwrite(content.data(), 1, content.size(), fp);
+    fclose(fp);
+    return Value(written == content.size());
+}
+
+Value StandardLibrary::writeLines(const std::string& path, const Value& listVal) {
+    if (!listVal.isList() || !listVal.listVal) {
+        return Value(false);
+    }
+    FILE* fp = fopen(path.c_str(), "wb");
+    if (!fp) {
+        return Value(false);
+    }
+    setvbuf(fp, NULL, _IOFBF, 262144);
+    for (const auto& item : *listVal.listVal) {
+        std::string s = item.toString();
+        if (!s.empty()) {
+            fwrite(s.data(), 1, s.size(), fp);
+        }
+        fputc('\n', fp);
+    }
+    fclose(fp);
+    return Value(true);
+}
+
+Value StandardLibrary::openFile(const std::string& path, const std::string& mode) {
+    std::string actualMode = mode.empty() ? "w" : mode;
+    if (actualMode.find('b') == std::string::npos && actualMode.find('+') == std::string::npos) {
+        actualMode += "b";
+    }
+    FILE* fp = fopen(path.c_str(), actualMode.c_str());
+    if (!fp) {
+        return Value();
+    }
+    setvbuf(fp, NULL, _IOFBF, 262144);
+    std::lock_guard<std::mutex> lock(g_managedFileMutex);
+    int64_t handleId = g_nextManagedFileId++;
+    ManagedFileHandle handle;
+    handle.fp = fp;
+    g_managedFiles[handleId] = std::move(handle);
+
+    Value obj = Value::makeObject();
+    obj.setProperty("__handle", Value(handleId));
+    obj.setProperty("path", Value(path));
+    obj.setProperty("mode", Value(mode));
+    obj.setProperty("is_open", Value(true));
+    return obj;
+}
+
+Value StandardLibrary::fileWrite(int64_t handleId, const std::string& content) {
+    std::lock_guard<std::mutex> lock(g_managedFileMutex);
+    auto it = g_managedFiles.find(handleId);
+    if (it == g_managedFiles.end() || !it->second.fp) {
+        return Value(false);
+    }
+    size_t written = fwrite(content.data(), 1, content.size(), it->second.fp);
+    return Value(written == content.size());
+}
+
+Value StandardLibrary::fileWriteLine(int64_t handleId, const std::string& line) {
+    std::lock_guard<std::mutex> lock(g_managedFileMutex);
+    auto it = g_managedFiles.find(handleId);
+    if (it == g_managedFiles.end() || !it->second.fp) {
+        return Value(false);
+    }
+    if (!line.empty()) {
+        fwrite(line.data(), 1, line.size(), it->second.fp);
+    }
+    fputc('\n', it->second.fp);
+    return Value(true);
+}
+
+Value StandardLibrary::fileFlush(int64_t handleId) {
+    std::lock_guard<std::mutex> lock(g_managedFileMutex);
+    auto it = g_managedFiles.find(handleId);
+    if (it == g_managedFiles.end() || !it->second.fp) {
+        return Value(false);
+    }
+    fflush(it->second.fp);
+    return Value(true);
+}
+
+Value StandardLibrary::fileClose(int64_t handleId) {
+    std::lock_guard<std::mutex> lock(g_managedFileMutex);
+    auto it = g_managedFiles.find(handleId);
+    if (it == g_managedFiles.end() || !it->second.fp) {
+        return Value(false);
+    }
+    fclose(it->second.fp);
+    g_managedFiles.erase(it);
+    return Value(true);
 }
 
 Value StandardLibrary::httpGet(const std::string& url) {

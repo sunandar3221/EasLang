@@ -11,6 +11,13 @@ public:
     static Value input(const std::string& prompt = "");
     static Value readFile(const std::string& path);
     static Value writeFile(const std::string& path, const std::string& content);
+    static Value appendFile(const std::string& path, const std::string& content);
+    static Value writeLines(const std::string& path, const Value& listVal);
+    static Value openFile(const std::string& path, const std::string& mode = "w");
+    static Value fileWrite(int64_t handleId, const std::string& content);
+    static Value fileWriteLine(int64_t handleId, const std::string& line);
+    static Value fileFlush(int64_t handleId);
+    static Value fileClose(int64_t handleId);
     static Value httpGet(const std::string& url);
     static Value httpSend(const std::string& url, const std::string& data);
 

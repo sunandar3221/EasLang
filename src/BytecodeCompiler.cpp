@@ -117,6 +117,7 @@ int BytecodeCompiler::resolveLocal(const std::string& name) {
 
 void BytecodeCompiler::addLocal(const std::string& name) {
     locals_.push_back({name, scopeDepth_});
+    currentChunk_->localIndices[name] = static_cast<int>(locals_.size() - 1);
     if (static_cast<int>(locals_.size()) > maxLocals_) {
         maxLocals_ = static_cast<int>(locals_.size());
     }

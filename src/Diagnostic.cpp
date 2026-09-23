@@ -247,7 +247,7 @@ std::vector<std::string> Diagnostic::getModuleMembers(const std::string& moduleN
             "random", "random_seed", "seed", "sin", "cos", "tan", "pi", "e"
         };
     } else if (moduleName == "io") {
-        return { "input", "ask", "read", "write", "print" };
+        return { "input", "ask", "read", "write", "append", "write_lines", "open", "print" };
     } else if (moduleName == "time") {
         return { "now", "sleep" };
     } else if (moduleName == "net" || moduleName == "http") {

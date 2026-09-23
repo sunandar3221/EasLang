@@ -52,7 +52,7 @@ Seluruh berkas binary resmi Fasthon otomatis dikompilasi oleh **GitHub Actions C
 1. **Buka Terminal** Anda.
 2. **Jalankan Installer 1-Baris**:
    ```bash
-   curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
+   curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash
    ```
    > 💡 **Apa yang dilakukan skrip ini?**
    > - Mendeteksi arsitektur CPU secara otomatis (`x86_64` atau `ARM64/aarch64`).
@@ -83,7 +83,7 @@ Fasthon dapat berjalan secara native dan berkecepatan penuh di smartphone Androi
    ```
 3. **Jalankan Installer 1-Baris**:
    ```bash
-   curl -sSL https://raw.githubusercontent.com/sunandar3221/EasLang/main/install.sh | bash
+   curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash
    ```
    > 💡 **Kelebihan di Termux:**
    > - Mengunduh binary native Android Bionic (`eas-android-arm64`) yang dikompilasi langsung menggunakan Google Android NDK Clang.
@@ -110,12 +110,12 @@ Anda dapat memilih salah satu dari dua metode berikut:
 #### Opsi 1: Unduh Cepat via PowerShell 1-Baris (Direkomendasikan)
 Buka PowerShell (tekan `Win + X` lalu pilih Terminal/PowerShell) dan jalankan:
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/sunandar3221/EasLang/releases/latest/download/fasthon.exe" -OutFile "$HOME\AppData\Local\Microsoft\WindowsApps\fasthon.exe"
+Invoke-WebRequest -Uri "https://github.com/sunandar3221/Fasthon/releases/latest/download/fasthon.exe" -OutFile "$HOME\AppData\Local\Microsoft\WindowsApps\fasthon.exe"
 ```
 > ✨ Direktori `WindowsApps` sudah otomatis terdaftar di `PATH` Windows, sehingga Anda dapat langsung mengetik `fasthon` (alias `eas`) atau `fasthon.exe` dari folder/terminal mana saja tanpa perlu setting Environment Variables secara manual!
 
 #### Opsi 2: Unduh Manual dari GitHub Releases
-1. Kunjungi [Halaman Rilis GitHub Fasthon](https://github.com/sunandar3221/EasLang/releases/latest).
+1. Kunjungi [Halaman Rilis GitHub Fasthon](https://github.com/sunandar3221/Fasthon/releases/latest).
 2. Unduh berkas **`fasthon.exe`** (atau `eas-windows-x64.exe`).
 3. Simpan berkas di folder pilihan Anda (misal `C:\Fasthon\fasthon.exe`).
 4. *(Opsional)* Tambahkan folder tersebut ke `PATH` di Environment Variables Windows.
@@ -132,7 +132,7 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code Fast
 
 - **Linux / macOS / Termux**:
   ```bash
-  git clone https://github.com/sunandar3221/EasLang.git
+  git clone https://github.com/sunandar3221/Fasthon.git
   cd Fasthon
   make
   sudo make install   # (di Termux cukup: make install)
@@ -140,7 +140,7 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code Fast
 
 - **Windows (MinGW / GCC / Clang)**:
   ```bash
-  git clone https://github.com/sunandar3221/EasLang.git
+  git clone https://github.com/sunandar3221/Fasthon.git
   cd Fasthon
   g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o fasthon.exe
   ```
@@ -623,12 +623,15 @@ Modul `io` mengelola interaksi konsol serta pembacaan dan penulisan berkas pada 
 | :--- | :--- | :--- |
 | `input(prompt)` *(atau `io.input`)* | Menampilkan teks pertanyaan ke layar konsol dan membaca satu baris input dari pengguna | `nama = input("Nama Anda: ")` |
 | `ask(prompt)` *(atau `io.ask`)* | Alternatif penulisan semantik dari fungsi `input` | `umur = ask("Umur: ")` |
-| `write(filepath, teks)` *(atau `io.write`)* | Menulis seluruh teks string ke berkas secara native (otomatis menimpa/membuat baru) | `write "pesan.txt" "Halo Dunia"` |
-| `read(filepath)` *(atau `io.read`)* | Membaca seluruh isi berkas teks dari disk ke dalam memori | `konten = read "pesan.txt"` |
+| `write(filepath, teks)` *(atau `io.write`)* | Menulis seluruh teks string ke berkas secara native dengan internal buffer 256 KB (otomatis menimpa/membuat baru) | `write "pesan.txt" "Halo Dunia"` |
+| `append(filepath, teks)` *(atau `io.append`)* | Menambahkan teks ke akhir berkas secara efisien tanpa menimpa (*append mode*) | `append "log.txt" "Baris baru\n"` |
+| `read(filepath)` *(atau `io.read`)* | Membaca seluruh isi berkas teks dari disk secara instan ke dalam memori | `konten = read "pesan.txt"` |
+| `io.open(filepath, mode)` *(atau `open`)* | Membuka stream berkas dengan internal buffer 256 KB. Mengembalikan objek file dengan method: `f.writeline(teks)`, `f.write(teks)`, `f.flush()`, `f.close()` untuk menulis ratusan ribu baris secepat kilat | `f = io.open("data.txt", "w")` |
+| `io.write_lines(filepath, list)` | Menulis seluruh elemen list string ke berkas sekaligus dalam satu operasi native tercepat | `io.write_lines("data.txt", barisList)` |
 | `io.print(...)` | Menampilkan teks output konsol yang terisolasi di dalam namespace `io` | `io.print "Data berhasil disimpan"` |
 
 ##### B. Contoh Praktis: Sistem Catatan & Penyimpanan Skor (High-Score Logger)
-```eas
+```fsn
 use io
 
 print "=== SISTEM PENCATAT SKOR GAME ==="
@@ -644,6 +647,15 @@ print "✅ Data pemain berhasil disimpan ke leaderboard.txt"
 print "\n📄 Isi Berkas leaderboard.txt Saat Ini:"
 isi = read "leaderboard.txt"
 print isi
+
+# --- Menulis 100.000 Baris Super Cepat dengan io.open() Stream Buffer ---
+f = io.open("transaksi.log", "w")
+i = 0
+while i < 100000
+    f.writeline("Log transaksi #${i} status=SUCCESS")
+    i = i + 1
+f.close()
+print "✅ 100.000 baris log transaksi berhasil ditulis dalam hitungan milidetik!"
 ```
 
 ---
@@ -920,6 +932,16 @@ Menguji performa operasi perulangan dan aritmatika intensif berskala besar:
 | **Fasthon Standalone Native Binary (`fasthon build`)** | **57 ms** | **37.8x lebih cepat** |
 | **Fasthon Ultra VM Engine (`fasthon script.fsn`)** | **209 ms** | **8.8x lebih cepat** |
 | **Python 3.14** | **2.157 ms** | Baseline CPython standar |
+
+### Benchmark D: Penulisan File I/O Baris Banyak (100.000 Baris Teks / 6.2 MB)
+
+Menguji performa penulisan berkas teks berskala besar menggunakan buffered stream writer (`io.open` + `f.writeline`):
+
+| Runtime / Engine | Waktu Eksekusi | Status & Catatan |
+| :--- | :--- | :--- |
+| **Fasthon Standalone Native Binary (`fasthon build`)** | **92 ms** | 100.000 baris (6.2 MB) ditulis langsung ke disk |
+| **Fasthon Ultra VM Engine (`fasthon script.fsn`)** | **868 ms** | Eksekusi instan di VM tanpa kompilasi binary |
+| **Batch Fast Write (`io.write_lines` 50.000 baris)** | **8 ms** | Satu proses batch writing direct C-level buffer |
 
 ---
 

@@ -298,8 +298,17 @@ Value VM::run(Chunk* chunk) {
                 const Value& b = *(top - 1);
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.intVal += b.intVal;
-                } else if (a.isString() || b.isString()) {
-                    a = a + b;
+                    a.floatVal = static_cast<double>(a.intVal);
+                } else if (a.isString()) {
+                    if (b.isString()) {
+                        a.strVal.append(b.strVal);
+                    } else {
+                        a.strVal.append(b.toString());
+                    }
+                } else if (b.isString()) {
+                    std::string s = a.toString();
+                    s.append(b.strVal);
+                    a = Value(std::move(s));
                 } else if (a.isNil() || b.isNil()) {
                     runtimeError("TypeError", "Operasi '+' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik atau string yang valid.");
                 } else {
@@ -638,6 +647,30 @@ Value VM::run(Chunk* chunk) {
                     Value c = *(--top);
                     Value p = *(--top);
                     *top++ = StandardLibrary::writeFile(p.toString(), c.toString());
+                } else if (name == "append" || name == "io.append") {
+                    requireModule("io", name);
+                    Value c = *(--top);
+                    Value p = *(--top);
+                    *top++ = StandardLibrary::appendFile(p.toString(), c.toString());
+                } else if (name == "write_lines" || name == "io.write_lines") {
+                    requireModule("io", name);
+                    Value lines = *(--top);
+                    Value p = *(--top);
+                    *top++ = StandardLibrary::writeLines(p.toString(), lines);
+                } else if (name == "open" || name == "io.open") {
+                    requireModule("io", name);
+                    std::string mode = "w";
+                    if (argCount >= 2) {
+                        mode = (*(--top)).toString();
+                        Value p = *(--top);
+                        if (argCount > 2) top -= (argCount - 2);
+                        *top++ = StandardLibrary::openFile(p.toString(), mode);
+                    } else if (argCount == 1) {
+                        Value p = *(--top);
+                        *top++ = StandardLibrary::openFile(p.toString(), "w");
+                    } else {
+                        *top++ = Value();
+                    }
                 } else if (name == "math.sqrt") {
                     requireModule("math", name);
                     double val = argCount > 0 ? (*(--top)).asFloat() : 0.0;
@@ -770,8 +803,51 @@ Value VM::run(Chunk* chunk) {
                         for (const auto& b : Diagnostic::getBuiltinFunctions()) candidates.push_back(b);
                         size_t dotPos = name.find('.');
                         if (dotPos != std::string::npos) {
-                            std::string mod = name.substr(0, dotPos);
-                            std::string fnName = name.substr(dotPos + 1);
+                            std::string varName = name.substr(0, dotPos);
+                            std::string method = name.substr(dotPos + 1);
+
+                            Value tgt;
+                            bool found = false;
+                            auto locIt = curChunk->localIndices.find(varName);
+                            if (locIt != curChunk->localIndices.end() && slots) {
+                                tgt = slots[locIt->second];
+                                found = true;
+                            } else {
+                                auto git = globals_.find(varName);
+                                if (git != globals_.end()) {
+                                    tgt = git->second;
+                                    found = true;
+                                }
+                            }
+
+                            if (found && tgt.isObject() && tgt.objVal) {
+                                auto hIt = tgt.objVal->find("__handle");
+                                if (hIt != tgt.objVal->end()) {
+                                    int64_t handleId = hIt->second.asInt();
+                                    if (method == "write") {
+                                        std::string text = argCount > 0 ? (*(--top)).toString() : "";
+                                        if (argCount > 1) top -= (argCount - 1);
+                                        *top++ = StandardLibrary::fileWrite(handleId, text);
+                                        break;
+                                    } else if (method == "writeline" || method == "write_line") {
+                                        std::string text = argCount > 0 ? (*(--top)).toString() : "";
+                                        if (argCount > 1) top -= (argCount - 1);
+                                        *top++ = StandardLibrary::fileWriteLine(handleId, text);
+                                        break;
+                                    } else if (method == "flush") {
+                                        if (argCount > 0) top -= argCount;
+                                        *top++ = StandardLibrary::fileFlush(handleId);
+                                        break;
+                                    } else if (method == "close") {
+                                        if (argCount > 0) top -= argCount;
+                                        *top++ = StandardLibrary::fileClose(handleId);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            std::string mod = varName;
+                            std::string fnName = method;
                             auto modMembers = Diagnostic::getModuleMembers(mod);
                             std::string memberMatch = Diagnostic::suggestSimilar(fnName, modMembers);
                             if (!memberMatch.empty()) {
