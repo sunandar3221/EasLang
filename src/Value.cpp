@@ -176,6 +176,20 @@ std::string Value::toString() const {
     }
 }
 
+std::string Value::getTypeName() const {
+    switch (type) {
+        case ValueType::NIL: return "nil";
+        case ValueType::BOOL: return "bool";
+        case ValueType::INT: return "int";
+        case ValueType::FLOAT: return "float";
+        case ValueType::STRING: return "str";
+        case ValueType::LIST: return "list";
+        case ValueType::OBJECT: return "object";
+        case ValueType::FUNCTION: return "function";
+        default: return "unknown";
+    }
+}
+
 bool Value::operator==(const Value& other) const {
     if (type != other.type) {
         if (isNumber() && other.isNumber()) {
@@ -252,6 +266,7 @@ Value Value::operator%(const Value& other) const {
 }
 
 bool Value::operator<(const Value& other) const {
+    if (isNil() || other.isNil()) return false;
     if (type == ValueType::INT && other.type == ValueType::INT) {
         return intVal < other.intVal;
     }
@@ -265,15 +280,18 @@ bool Value::operator<(const Value& other) const {
 }
 
 bool Value::operator>(const Value& other) const {
+    if (isNil() || other.isNil()) return false;
     return other < *this;
 }
 
 bool Value::operator<=(const Value& other) const {
-    return !(other < *this);
+    if (isNil() || other.isNil()) return false;
+    return (*this < other) || (*this == other);
 }
 
 bool Value::operator>=(const Value& other) const {
-    return !(*this < other);
+    if (isNil() || other.isNil()) return false;
+    return (other < *this) || (*this == other);
 }
 
 Value Value::getIndex(const Value& index) const {

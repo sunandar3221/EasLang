@@ -292,6 +292,10 @@ Value VM::run(Chunk* chunk) {
                 const Value& b = *(top - 1);
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.intVal += b.intVal;
+                } else if (a.isString() || b.isString()) {
+                    a = a + b;
+                } else if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operasi '+' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik atau string yang valid.");
                 } else {
                     a = a + b;
                 }
@@ -301,6 +305,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_SUB: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operasi '-' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik yang valid.");
+                }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.intVal -= b.intVal;
                 } else {
@@ -312,6 +319,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_MUL: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operasi '*' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik yang valid.");
+                }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.intVal *= b.intVal;
                 } else {
@@ -323,6 +333,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_DIV: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operasi '/' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik yang valid.");
+                }
                 if (b.asFloat() == 0.0) {
                     runtimeError("ZeroDivisionError", "Pembagian dengan angka nol tidak diperbolehkan (division by zero).", curChunk, ip, frameCount);
                 }
@@ -337,6 +350,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_MOD: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operasi '%' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik yang valid.");
+                }
                 if (b.asInt() == 0) {
                     runtimeError("ZeroDivisionError", "Operasi modulo dengan angka nol tidak diperbolehkan (modulo by zero).", curChunk, ip, frameCount);
                 }
@@ -354,6 +370,9 @@ Value VM::run(Chunk* chunk) {
             }
             case OpCode::OP_NEGATE: {
                 Value& a = *(top - 1);
+                if (a.isNil()) {
+                    runtimeError("TypeError", "Operasi negasi '-' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik yang valid.");
+                }
                 if (a.type == ValueType::INT) {
                     a.intVal = -a.intVal;
                 } else if (a.type == ValueType::FLOAT) {
@@ -403,6 +422,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_LESS: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operator '<' tidak dapat membandingkan '" + a.getTypeName() + "' dengan '" + b.getTypeName() + "'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.type = ValueType::BOOL;
                     a.boolVal = (a.intVal < b.intVal);
@@ -417,6 +439,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_LESS_EQUAL: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operator '<=' tidak dapat membandingkan '" + a.getTypeName() + "' dengan '" + b.getTypeName() + "'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.type = ValueType::BOOL;
                     a.boolVal = (a.intVal <= b.intVal);
@@ -431,6 +456,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_GREATER: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operator '>' tidak dapat membandingkan '" + a.getTypeName() + "' dengan '" + b.getTypeName() + "'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.type = ValueType::BOOL;
                     a.boolVal = (a.intVal > b.intVal);
@@ -445,6 +473,9 @@ Value VM::run(Chunk* chunk) {
             case OpCode::OP_GREATER_EQUAL: {
                 Value& a = *(top - 2);
                 const Value& b = *(top - 1);
+                if (a.isNil() || b.isNil()) {
+                    runtimeError("TypeError", "Operator '>=' tidak dapat membandingkan '" + a.getTypeName() + "' dengan '" + b.getTypeName() + "'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                }
                 if (a.type == ValueType::INT && b.type == ValueType::INT) {
                     a.type = ValueType::BOOL;
                     a.boolVal = (a.intVal >= b.intVal);
@@ -531,11 +562,11 @@ Value VM::run(Chunk* chunk) {
                     Value arg = argCount > 0 ? *(--top) : Value("");
                     *top++ = Value(arg.toString());
                 } else if (name == "int") {
-                    Value arg = argCount > 0 ? *(--top) : Value(static_cast<int64_t>(0));
-                    *top++ = Value(arg.asInt());
+                    Value arg = argCount > 0 ? *(--top) : Value();
+                    *top++ = StandardLibrary::toInt(arg);
                 } else if (name == "float") {
-                    Value arg = argCount > 0 ? *(--top) : Value(0.0);
-                    *top++ = Value(arg.asFloat());
+                    Value arg = argCount > 0 ? *(--top) : Value();
+                    *top++ = StandardLibrary::toFloat(arg);
                 } else if (name == "lower" || name == "to_lower" || name == "lowercase" || name == "kecil" || name == "str.lower") {
                     Value arg = argCount > 0 ? *(--top) : Value("");
                     *top++ = StandardLibrary::toLower(arg.toString());

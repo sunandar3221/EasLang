@@ -22,6 +22,8 @@ public:
     static Value toUpper(const std::string& str);
     static Value caseSensitive(const std::string& a, const std::string& b);
     static Value incaseSensitive(const std::string& a, const std::string& b);
+    static Value toInt(const Value& val);
+    static Value toFloat(const Value& val);
 
     static Value mathSqrt(double val);
     static Value mathAbs(double val);

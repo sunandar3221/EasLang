@@ -1,6 +1,7 @@
 #include "Interpreter.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Diagnostic.hpp"
 
 struct ReturnException {
     Value value;
@@ -344,27 +345,68 @@ Value Interpreter::evaluate(Expr* expr) {
         Value right = evaluate(bin->right.get());
 
         switch (bin->op) {
-            case TokenType::PLUS: return left + right;
-            case TokenType::MINUS: return left - right;
-            case TokenType::STAR: return left * right;
+            case TokenType::PLUS: {
+                if ((left.isNil() || right.isNil()) && !left.isString() && !right.isString()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operasi '+' tidak dapat dilakukan pada 'nil'.", bin->line, bin->column, 1, "", "Pastikan variabel memiliki nilai numerik atau string yang valid."));
+                }
+                return left + right;
+            }
+            case TokenType::MINUS: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operasi '-' tidak dapat dilakukan pada 'nil'.", bin->line, bin->column, 1, "", "Pastikan variabel memiliki nilai numerik yang valid."));
+                }
+                return left - right;
+            }
+            case TokenType::STAR: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operasi '*' tidak dapat dilakukan pada 'nil'.", bin->line, bin->column, 1, "", "Pastikan variabel memiliki nilai numerik yang valid."));
+                }
+                return left * right;
+            }
             case TokenType::SLASH: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operasi '/' tidak dapat dilakukan pada 'nil'.", bin->line, bin->column, 1, "", "Pastikan variabel memiliki nilai numerik yang valid."));
+                }
                 if (right.asFloat() == 0.0) {
-                    throw std::runtime_error("Division by zero at line " + std::to_string(bin->line));
+                    throw std::runtime_error(Diagnostic::format("ZeroDivisionError", "Pembagian dengan angka nol tidak diperbolehkan (division by zero).", bin->line, bin->column, 1));
                 }
                 return left / right;
             }
             case TokenType::PERCENT: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operasi '%' tidak dapat dilakukan pada 'nil'.", bin->line, bin->column, 1, "", "Pastikan variabel memiliki nilai numerik yang valid."));
+                }
                 if (right.asInt() == 0) {
-                    throw std::runtime_error("Modulo by zero at line " + std::to_string(bin->line));
+                    throw std::runtime_error(Diagnostic::format("ZeroDivisionError", "Operasi modulo dengan angka nol tidak diperbolehkan (modulo by zero).", bin->line, bin->column, 1));
                 }
                 return left % right;
             }
             case TokenType::EQUAL_EQUAL: return Value(left == right);
             case TokenType::BANG_EQUAL: return Value(left != right);
-            case TokenType::LESS: return Value(left < right);
-            case TokenType::GREATER: return Value(left > right);
-            case TokenType::LESS_EQUAL: return Value(left <= right);
-            case TokenType::GREATER_EQUAL: return Value(left >= right);
+            case TokenType::LESS: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operator '<' tidak dapat membandingkan '" + left.getTypeName() + "' dengan '" + right.getTypeName() + "'.", bin->line, bin->column, 1, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan."));
+                }
+                return Value(left < right);
+            }
+            case TokenType::GREATER: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operator '>' tidak dapat membandingkan '" + left.getTypeName() + "' dengan '" + right.getTypeName() + "'.", bin->line, bin->column, 1, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan."));
+                }
+                return Value(left > right);
+            }
+            case TokenType::LESS_EQUAL: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operator '<=' tidak dapat membandingkan '" + left.getTypeName() + "' dengan '" + right.getTypeName() + "'.", bin->line, bin->column, 1, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan."));
+                }
+                return Value(left <= right);
+            }
+            case TokenType::GREATER_EQUAL: {
+                if (left.isNil() || right.isNil()) {
+                    throw std::runtime_error(Diagnostic::format("TypeError", "Operator '>=' tidak dapat membandingkan '" + left.getTypeName() + "' dengan '" + right.getTypeName() + "'.", bin->line, bin->column, 1, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan."));
+                }
+                return Value(left >= right);
+            }
             case TokenType::AND: return Value(left.isTruthy() && right.isTruthy());
             case TokenType::OR: return Value(left.isTruthy() || right.isTruthy());
             default: return Value();
@@ -426,11 +468,11 @@ Value Interpreter::evaluate(Expr* expr) {
         }
 
         if (name == "int" && !call->arguments.empty()) {
-            return Value(evaluate(call->arguments[0].get()).asInt());
+            return StandardLibrary::toInt(evaluate(call->arguments[0].get()));
         }
 
         if (name == "float" && !call->arguments.empty()) {
-            return Value(evaluate(call->arguments[0].get()).asFloat());
+            return StandardLibrary::toFloat(evaluate(call->arguments[0].get()));
         }
 
         if ((name == "lower" || name == "to_lower" || name == "lowercase" || name == "kecil" || name == "str.lower") && !call->arguments.empty()) {

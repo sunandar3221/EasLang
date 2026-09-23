@@ -302,6 +302,67 @@ Value StandardLibrary::incaseSensitive(const std::string& a, const std::string& 
     return Value(true);
 }
 
+Value StandardLibrary::toInt(const Value& val) {
+    if (val.isNil()) return Value();
+    if (val.isInt()) return val;
+    if (val.isFloat()) return Value(static_cast<int64_t>(val.floatVal));
+    if (val.isBool()) return Value(static_cast<int64_t>(val.boolVal ? 1 : 0));
+    if (val.isString()) {
+        std::string s = val.strVal;
+        size_t start = 0;
+        while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) start++;
+        size_t end = s.size();
+        while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) end--;
+        if (start >= end) return Value();
+        s = s.substr(start, end - start);
+
+        try {
+            size_t idx = 0;
+            long long parsed = std::stoll(s, &idx);
+            if (idx == s.size()) {
+                return Value(static_cast<int64_t>(parsed));
+            }
+            if (s[idx] == '.') {
+                size_t dIdx = 0;
+                double d = std::stod(s, &dIdx);
+                if (dIdx == s.size()) {
+                    return Value(static_cast<int64_t>(d));
+                }
+            }
+        } catch (...) {
+            return Value();
+        }
+    }
+    return Value();
+}
+
+Value StandardLibrary::toFloat(const Value& val) {
+    if (val.isNil()) return Value();
+    if (val.isFloat()) return val;
+    if (val.isInt()) return Value(static_cast<double>(val.intVal));
+    if (val.isBool()) return Value(val.boolVal ? 1.0 : 0.0);
+    if (val.isString()) {
+        std::string s = val.strVal;
+        size_t start = 0;
+        while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) start++;
+        size_t end = s.size();
+        while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) end--;
+        if (start >= end) return Value();
+        s = s.substr(start, end - start);
+
+        try {
+            size_t idx = 0;
+            double d = std::stod(s, &idx);
+            if (idx == s.size()) {
+                return Value(d);
+            }
+        } catch (...) {
+            return Value();
+        }
+    }
+    return Value();
+}
+
 Value StandardLibrary::mathSqrt(double val) {
     return Value(std::sqrt(val));
 }

@@ -65,6 +65,7 @@ public:
     double asFloat() const;
     int64_t asInt() const;
     std::string toString() const;
+    std::string getTypeName() const;
 
     bool operator==(const Value& other) const;
     bool operator!=(const Value& other) const;
