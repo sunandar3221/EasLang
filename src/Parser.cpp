@@ -579,7 +579,10 @@ std::unique_ptr<Stmt> Parser::parseContinue() {
 std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {
     int line = peek().line;
     if (check(TokenType::IDENTIFIER) && peekNext().type == TokenType::ASSIGN) {
-        std::string name = advance().lexeme;
+        Token idTok = advance();
+        std::string name = idTok.lexeme;
+        int assignLine = idTok.line;
+        int assignCol = idTok.column;
         advance();
         skipNewlines();
         if (check(TokenType::LOOP)) {
@@ -612,45 +615,84 @@ std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {
             }
             return std::make_unique<AssignStmt>(std::move(name), std::make_unique<IfExpr>(std::move(condition), std::move(thenBranch), std::move(elseBranch), ifLine), line);
         }
+        if (check(TokenType::PRINT) || check(TokenType::SILENT_PRINT)) {
+            bool silent = (peek().type == TokenType::SILENT_PRINT);
+            auto printStmt = parsePrint(silent);
+            if (check(TokenType::NEWLINE)) advance();
+            if (!isAtEnd() && peek().line > assignLine && peek().column > assignCol) {
+                reportError("Penugasan fungsi ke variabel hanya mendukung 1 baris tanpa parameter. Gunakan 'def' untuk fungsi multi-baris.", peek(), "Gunakan 'def " + name + "()' untuk fungsi multi-baris.", "Fungsi multi-baris wajib menggunakan 'def' dan ditutup dengan 'end'.");
+                while (!isAtEnd() && peek().column > assignCol) {
+                    advance();
+                }
+                return nullptr;
+            }
+            auto body = std::make_unique<BlockStmt>();
+            body->statements.push_back(std::move(printStmt));
+            functionArity_[name] = 0;
+            return std::make_unique<FnDeclStmt>(name, std::vector<std::string>{}, std::move(body), assignLine);
+        }
+        if (check(TokenType::WRITE)) {
+            auto writeStmt = parseWrite();
+            if (check(TokenType::NEWLINE)) advance();
+            if (!isAtEnd() && peek().line > assignLine && peek().column > assignCol) {
+                reportError("Penugasan fungsi ke variabel hanya mendukung 1 baris tanpa parameter. Gunakan 'def' untuk fungsi multi-baris.", peek(), "Gunakan 'def " + name + "()' untuk fungsi multi-baris.", "Fungsi multi-baris wajib menggunakan 'def' dan ditutup dengan 'end'.");
+                while (!isAtEnd() && peek().column > assignCol) {
+                    advance();
+                }
+                return nullptr;
+            }
+            auto body = std::make_unique<BlockStmt>();
+            body->statements.push_back(std::move(writeStmt));
+            functionArity_[name] = 0;
+            return std::make_unique<FnDeclStmt>(name, std::vector<std::string>{}, std::move(body), assignLine);
+        }
         if (check(TokenType::FN)) {
-            int fnLine = advance().line;
-            std::vector<std::string> params;
+            Token fnTok = advance();
+            bool hasParams = false;
             if (match(TokenType::LPAREN)) {
                 skipNewlines();
                 if (!check(TokenType::RPAREN)) {
-                    do {
-                        skipNewlines();
-                        if (check(TokenType::RPAREN) || isAtEnd()) break;
-                        if (check(TokenType::IDENTIFIER)) {
-                            params.push_back(advance().lexeme);
-                        } else {
-                            if (!isAtEnd() && !check(TokenType::RPAREN) && !check(TokenType::COMMA) && !check(TokenType::NEWLINE)) {
-                                advance();
-                            }
-                        }
-                        skipNewlines();
-                    } while (match(TokenType::COMMA));
+                    hasParams = true;
                 }
-                skipNewlines();
+                while (!check(TokenType::RPAREN) && !isAtEnd()) advance();
                 match(TokenType::RPAREN);
             } else {
-                while (check(TokenType::IDENTIFIER)) {
-                    params.push_back(advance().lexeme);
-                    match(TokenType::COMMA);
+                if (check(TokenType::IDENTIFIER)) {
+                    hasParams = true;
+                    while (check(TokenType::IDENTIFIER)) advance();
                 }
             }
-            std::string fnName = "$anon_" + std::to_string(anonFnCounter_++);
-            functionArity_[fnName] = static_cast<int>(params.size());
-            functionArity_[name] = static_cast<int>(params.size());
-            if (match(TokenType::DO)) {}
-            if (check(TokenType::NEWLINE)) advance();
-            auto body = parseBlock(false);
-            skipNewlines();
-            if (!match(TokenType::END)) {
-                reportError("Diharapkan 'end' untuk menutup fungsi anonim", peek(), "Tambahkan 'end' di akhir fungsi.", "Setiap fungsi anonim wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+            if (hasParams) {
+                reportError("Penugasan fungsi ke variabel tidak boleh memiliki parameter. Gunakan 'def' untuk mendefinisikan fungsi dengan parameter.", fnTok, "Ubah menjadi 'def " + name + "(...)'", "Hanya 'def' yang mendukung fungsi dengan parameter.");
+                return nullptr;
             }
-            hoistedAnonFns_.push_back(std::make_unique<FnDeclStmt>(fnName, params, std::make_unique<BlockStmt>(std::move(body->statements)), fnLine));
-            return std::make_unique<AssignStmt>(std::move(name), std::make_unique<VarExpr>(fnName, fnLine), line);
+            if (check(TokenType::NEWLINE)) {
+                reportError("Penugasan fungsi ke variabel hanya mendukung 1 baris tanpa parameter. Gunakan 'def' untuk fungsi multi-baris.", peek(), "Gunakan 'def " + name + "()' untuk fungsi berbaris-baris.", "Fungsi multi-baris wajib menggunakan 'def' dan ditutup dengan 'end'.");
+                return nullptr;
+            }
+            if (match(TokenType::DO)) {}
+            std::unique_ptr<Stmt> singleStmt = nullptr;
+            if (check(TokenType::PRINT) || check(TokenType::SILENT_PRINT)) {
+                singleStmt = parsePrint(check(TokenType::SILENT_PRINT));
+            } else if (check(TokenType::WRITE)) {
+                singleStmt = parseWrite();
+            } else {
+                auto expr = parseExpression();
+                singleStmt = std::make_unique<ExprStmt>(std::move(expr), fnTok.line);
+            }
+            if (check(TokenType::NEWLINE)) advance();
+            if (!isAtEnd() && peek().line > assignLine && peek().column > assignCol) {
+                reportError("Penugasan fungsi ke variabel hanya mendukung 1 baris tanpa parameter. Gunakan 'def' untuk fungsi multi-baris.", peek(), "Gunakan 'def " + name + "()' untuk fungsi multi-baris.", "Fungsi multi-baris wajib menggunakan 'def' dan ditutup dengan 'end'.");
+                while (!isAtEnd() && peek().column > assignCol) {
+                    advance();
+                }
+                return nullptr;
+            }
+            if (check(TokenType::END)) advance();
+            auto body = std::make_unique<BlockStmt>();
+            body->statements.push_back(std::move(singleStmt));
+            functionArity_[name] = 0;
+            return std::make_unique<FnDeclStmt>(name, std::vector<std::string>{}, std::move(body), assignLine);
         }
         auto val = parseExpression();
         if (auto* varExp = dynamic_cast<VarExpr*>(val.get())) {
@@ -660,6 +702,13 @@ std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {
             }
         }
         if (check(TokenType::NEWLINE)) advance();
+        if (!isAtEnd() && peek().line > assignLine && peek().column > assignCol) {
+            reportError("Penugasan ke variabel hanya mendukung 1 baris. Gunakan 'def' untuk blok kode multi-baris.", peek(), "Gunakan 'def " + name + "()' jika ingin membuat blok fungsi.", "Fungsi multi-baris wajib menggunakan 'def' dan ditutup dengan 'end'.");
+            while (!isAtEnd() && peek().column > assignCol) {
+                advance();
+            }
+            return nullptr;
+        }
         return std::make_unique<AssignStmt>(std::move(name), std::move(val), line);
     }
 

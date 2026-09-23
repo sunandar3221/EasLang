@@ -344,17 +344,23 @@ print cekStatus(20) # Output: Adult
 ```
 
 #### Memasukkan Fungsi ke Variabel (First-Class Functions)
-Fungsi di Fasthon dapat disimpan ke dalam variabel dan dideklarasikan secara dinamis:
+Fungsi di Fasthon dapat disimpan ke dalam variabel. Penugasan fungsi langsung ke variabel dibuat sangat ringkas: **hanya 1 baris tanpa parameter dan tanpa memerlukan kata kunci `end`**:
 
 ```fasthon
+# Merujuk fungsi yang sudah ada
 operasi = add
 print operasi 15 25
 
-kali = fn x y
-    x * y
-end
+# Menugaskan fungsi 1 baris langsung ke variabel (tanpa parameter & tanpa end)
+hai = print("hei")
+hai()  # Output: hei
 
-print kali 4 5
+# Catatan: Penugasan fungsi ke variabel 2 baris atau lebih akan ditolak.
+# Jika membutuhkan fungsi multi-baris atau berparameter, WAJIB menggunakan 'def':
+def kali(x, y)
+    return x * y
+end
+print kali(4, 5)  # Output: 20
 ```
 
 ### Bab 7: Pustaka I/O & Input Interaktif (`use io` / `import io`)
