@@ -50,6 +50,8 @@ void Lexer::initKeywords() {
     keywords_["window"] = TokenType::WINDOW;
     keywords_["run"] = TokenType::RUN;
     keywords_["end"] = TokenType::END;
+    keywords_["then"] = TokenType::THEN;
+    keywords_["do"] = TokenType::DO;
     keywords_["and"] = TokenType::AND;
     keywords_["or"] = TokenType::OR;
     keywords_["not"] = TokenType::NOT;
@@ -90,54 +92,21 @@ bool Lexer::match(char expected) {
     return true;
 }
 
-void Lexer::handleIndentation(std::vector<Token>& tokens) {
-    int indent = 0;
-    size_t tempCursor = cursor_;
-    int tempCol = column_;
-    
-    while (tempCursor < source_.size()) {
-        char c = source_[tempCursor];
+void Lexer::handleIndentation(std::vector<Token>& /*tokens*/) {
+    while (cursor_ < source_.size()) {
+        char c = source_[cursor_];
         if (c == ' ') {
-            indent++;
-            tempCursor++;
-            tempCol++;
+            cursor_++;
+            column_++;
         } else if (c == '\t') {
-            indent += 4;
-            tempCursor++;
-            tempCol += 4;
+            cursor_++;
+            column_ += 4;
         } else if (c == '\r') {
-            tempCursor++;
+            cursor_++;
         } else {
             break;
         }
     }
-
-    if (tempCursor >= source_.size() || source_[tempCursor] == '\n' || source_[tempCursor] == '#' ||
-        (source_[tempCursor] == '/' && tempCursor + 1 < source_.size() && source_[tempCursor + 1] == '/')) {
-        while (tempCursor < source_.size() && source_[tempCursor] != '\n') {
-            tempCursor++;
-        }
-        cursor_ = tempCursor;
-        column_ = tempCol;
-        return;
-    }
-
-    cursor_ = tempCursor;
-    column_ = tempCol;
-
-    if (bracketNesting_ == 0) {
-        int previousIndent = indentStack_.back();
-        if (indent > previousIndent) {
-            indentStack_.push_back(indent);
-            tokens.emplace_back(TokenType::INDENT, "", line_, column_);
-        } else if (indent < previousIndent) {
-            while (indentStack_.size() > 1 && indentStack_.back() > indent) {
-                indentStack_.pop_back();
-                tokens.emplace_back(TokenType::DEDENT, "", line_, column_);
-            }
-        }
-    }
-
     atLineStart_ = false;
 }
 
@@ -265,9 +234,7 @@ std::vector<Token> Lexer::tokenize() {
 
         if (c == '\n') {
             if (bracketNesting_ == 0) {
-                if (!tokens.empty() &&
-                    tokens.back().type != TokenType::NEWLINE &&
-                    tokens.back().type != TokenType::INDENT) {
+                if (!tokens.empty() && tokens.back().type != TokenType::NEWLINE) {
                     tokens.emplace_back(TokenType::NEWLINE, "\n", line_, column_);
                 }
             }
@@ -354,15 +321,8 @@ std::vector<Token> Lexer::tokenize() {
         }
     }
 
-    if (!tokens.empty() &&
-        tokens.back().type != TokenType::NEWLINE &&
-        tokens.back().type != TokenType::DEDENT) {
+    if (!tokens.empty() && tokens.back().type != TokenType::NEWLINE) {
         tokens.emplace_back(TokenType::NEWLINE, "\n", line_, column_);
-    }
-
-    while (indentStack_.size() > 1) {
-        indentStack_.pop_back();
-        tokens.emplace_back(TokenType::DEDENT, "", line_, column_);
     }
 
     tokens.emplace_back(TokenType::END_OF_FILE, "", line_, column_);

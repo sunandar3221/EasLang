@@ -34,6 +34,8 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::WINDOW: return "WINDOW";
         case TokenType::RUN: return "RUN";
         case TokenType::END: return "END";
+        case TokenType::THEN: return "THEN";
+        case TokenType::DO: return "DO";
         case TokenType::AND: return "AND";
         case TokenType::OR: return "OR";
         case TokenType::NOT: return "NOT";

@@ -34,7 +34,7 @@ private:
     void skipNewlines();
     bool isIndexOrPropAssign() const;
 
-    std::unique_ptr<BlockStmt> parseBlock();
+    std::unique_ptr<BlockStmt> parseBlock(bool stopAtElse = false);
     std::unique_ptr<Stmt> parsePrint(bool silent = false);
     std::unique_ptr<Stmt> parseWrite();
     std::unique_ptr<Stmt> parseApp();
@@ -42,7 +42,7 @@ private:
     std::unique_ptr<Stmt> parseRun();
     std::unique_ptr<Stmt> parseSet();
     std::unique_ptr<Stmt> parseUse();
-    std::unique_ptr<Stmt> parseIf();
+    std::unique_ptr<Stmt> parseIf(bool isElif = false);
     std::unique_ptr<Stmt> parseLoop();
     std::unique_ptr<Stmt> parseWhile();
     std::unique_ptr<Stmt> parseFnDecl();

@@ -218,7 +218,7 @@ print len(buah)          # Output: 2
 ```
 
 ### Bab 4: Percabangan (`if` - `elseif` / `elif` - `else`), If Expression, & Pencocokan Teks
-Percabangan menggunakan kata kunci `if`, `elseif` (atau `elif`), dan `else` berbasis indentasi bersih tanpa kurung kurawal atau titik dua. Keyword `end` dapat digunakan secara opsional.
+Percabangan menggunakan kata kunci `if`, `elseif` (atau `elif`), dan `else`. Sesuai kaidah gaya Lua yang tahan banting, setiap blok percabangan **wajib ditutup dengan kata kunci `end`**.
 
 #### 1. Percabangan Bersarang & Multikondisi (`elseif` / `elif`)
 Anda dapat menggunakan `elseif` maupun `elif` untuk mengecek banyak kondisi secara berurutan:
@@ -233,6 +233,7 @@ elif nilai >= 70
     print "Grade C"
 else
     print "Grade D"
+end
 ```
 
 #### 2. If Expression (Menugaskan Nilai Percabangan ke Variabel)
@@ -244,6 +245,7 @@ status = if nilai >= 75
     "Selamat Anda Lulus"
 else
     "Silakan Mengulang Ujian"
+end
 
 print status  # Output: Selamat Anda Lulus
 ```
@@ -261,12 +263,14 @@ nama = "Agus"
 # Menyamakan huruf kapital dan non-kapital (Incase Sensitive)
 if incase_sensitive(nama, "agus")
     print "Nama cocok (mengabaikan huruf besar/kecil)!"
+end
 
 # Membedakan huruf kapital dan non-kapital (Case Sensitive)
 if case_sensitive(nama, "agus")
     print "Sama persis"
 else
     print "Huruf besar/kecil berbeda: 'Agus' != 'agus'"
+end
 
 # Mengubah bentuk huruf
 print lower("Halo Dunia")  # Output: halo dunia
@@ -274,8 +278,8 @@ print upper("halo dunia")  # Output: HALO DUNIA
 ```
 
 ### Bab 5: Perulangan (`loop` & `while`), `break`, dan `continue`
-- Gunakan `loop <jumlah>` untuk mengulang blok sebanyak $n$ kali secara terhitung.
-- Gunakan `while <kondisi>` untuk perulangan berbasis evaluasi kondisi.
+- Gunakan `loop <jumlah>` untuk mengulang blok sebanyak $n$ kali secara terhitung (tutup dengan `end`).
+- Gunakan `while <kondisi>` untuk perulangan berbasis evaluasi kondisi (tutup dengan `end`).
 - Gunakan `break` untuk keluar dari loop seketika.
 - Gunakan `continue` untuk melompati sisa iterasi saat ini dan lanjut ke iterasi berikutnya.
 
@@ -283,6 +287,7 @@ print upper("halo dunia")  # Output: HALO DUNIA
 # Perulangan loop terhitung
 loop 3
     print "Pengulangan loop"
+end
 
 # Perulangan while dengan break dan continue
 i = 0
@@ -290,9 +295,12 @@ while true
     i = i + 1
     if i == 3
         continue  # Lewati angka 3
+    end
     if i > 5
         break     # Keluar saat i melebihi 5
+    end
     print "Angka: ${i}"
+end
 ```
 
 #### Loop Assignment & `silent_print`
@@ -303,12 +311,13 @@ use io
 
 halo = loop 3000
     silent_print "kamu manusia apa apa"
+end
 
 write "hai.txt" halo
 ```
 
 ### Bab 6: Fungsi, Explicit & Implicit Return, serta Kata Kunci Alternatif (`fn`, `def`, `func`)
-Fungsi dapat dideklarasikan dengan `fn`, `def`, `func`, maupun `function`, diikuti nama fungsi dan parameter yang dipisahkan spasi.
+Fungsi dapat dideklarasikan dengan `fn`, `def`, `func`, maupun `function`, diikuti nama fungsi dan parameter yang dipisahkan spasi atau kurung `(param)`. Setiap deklarasi fungsi wajib ditutup dengan kata kunci `end`.
 - **Implicit & Explicit Return**: Baris terakhir otomatis menjadi nilai balik fungsi, ATAU Anda dapat menggunakan kata kunci `return` untuk mengembalikan nilai secara eksplisit / keluar lebih awal (*early exit*).
 - **Fleksibilitas Pemanggilan**: Fungsi dapat dipanggil dengan gaya perintah `add 10 20` maupun gaya kurung `add(10, 20)`.
 
@@ -316,6 +325,7 @@ Fungsi dapat dideklarasikan dengan `fn`, `def`, `func`, maupun `function`, diiku
 # Menggunakan kata kunci 'fn' dengan implicit return
 fn add a b
     a + b
+end
 
 print add 10 20
 print add(10, 20)
@@ -326,7 +336,9 @@ def cekStatus umur
         return "Tidak valid"
     elseif umur < 18
         return "Minor"
+    end
     return "Adult"
+end
 
 print cekStatus(20) # Output: Adult
 ```
@@ -340,6 +352,7 @@ print operasi 15 25
 
 kali = fn x y
     x * y
+end
 
 print kali 4 5
 ```

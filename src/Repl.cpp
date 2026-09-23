@@ -45,7 +45,8 @@ void Repl::run() {
             return false;
         };
         return startsWithWord("if") || startsWithWord("else") || startsWithWord("elif") ||
-               startsWithWord("while") || startsWithWord("loop") || startsWithWord("fn");
+               startsWithWord("while") || startsWithWord("loop") || startsWithWord("fn") ||
+               startsWithWord("def") || startsWithWord("func") || startsWithWord("function");
     };
 
     auto isBlockContinuation = [](const std::string& trimmed) {
@@ -108,6 +109,8 @@ void Repl::run() {
         }
     };
 
+    int blockLevel = 0;
+
     while (true) {
         if (buffer.empty()) {
             std::cout << "Fasthon> ";
@@ -141,34 +144,27 @@ void Repl::run() {
                 continue;
             }
             if (startsBlock(trimmed) || countBrackets(line)) {
+                if (startsBlock(trimmed)) blockLevel = 1;
                 buffer = line + "\n";
             } else {
                 executeCode(line);
             }
         } else {
-            if (trimmed.empty()) {
-                if (!countBrackets(buffer)) {
-                    executeCode(buffer);
-                    buffer.clear();
-                } else {
-                    buffer += "\n";
-                }
-            } else {
-                bool isIndented = (!line.empty() && (line[0] == ' ' || line[0] == '\t'));
-                if (!isIndented && !countBrackets(buffer) && !isBlockContinuation(trimmed)) {
-                    executeCode(buffer);
-                    buffer.clear();
-                    if (trimmed == "exit") {
-                        break;
-                    }
-                    if (startsBlock(trimmed) || countBrackets(line)) {
-                        buffer = line + "\n";
-                    } else {
-                        executeCode(line);
-                    }
-                } else {
-                    buffer += line + "\n";
-                }
+            buffer += line + "\n";
+            if (startsBlock(trimmed)) {
+                blockLevel++;
+            }
+            if (trimmed == "end") {
+                if (blockLevel > 0) blockLevel--;
+            }
+            if (blockLevel <= 0 && !countBrackets(buffer)) {
+                executeCode(buffer);
+                buffer.clear();
+                blockLevel = 0;
+            } else if (trimmed.empty() && !countBrackets(buffer)) {
+                executeCode(buffer);
+                buffer.clear();
+                blockLevel = 0;
             }
         }
     }

@@ -40,6 +40,8 @@ enum class TokenType {
     WINDOW,
     RUN,
     END,
+    THEN,
+    DO,
 
     AND,
     OR,

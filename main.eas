@@ -6,3 +6,4 @@ if nama == "Agus"
     print "Halo Gusion!"
 else
     print  "Halo " + nama
+end

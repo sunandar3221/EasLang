@@ -189,42 +189,24 @@ std::unique_ptr<BlockStmt> Parser::parseProgram() {
     return block;
 }
 
-std::unique_ptr<BlockStmt> Parser::parseBlock() {
+std::unique_ptr<BlockStmt> Parser::parseBlock(bool stopAtElse) {
     auto block = std::make_unique<BlockStmt>();
     skipNewlines();
 
-    if (match(TokenType::INDENT)) {
-        while (!isAtEnd() && !check(TokenType::DEDENT)) {
-            skipNewlines();
-            if (check(TokenType::DEDENT) || isAtEnd()) break;
-            if (check(TokenType::END)) {
-                advance();
-                break;
-            }
-            size_t prevCursor = cursor_;
-            auto stmt = parseStatement();
-            if (stmt) {
-                block->statements.push_back(std::move(stmt));
-            }
-            if (cursor_ == prevCursor && !isAtEnd()) {
-                advance();
-            }
+    while (!isAtEnd()) {
+        skipNewlines();
+        if (isAtEnd()) break;
+        if (check(TokenType::END)) break;
+        if (stopAtElse && (check(TokenType::ELSE) || check(TokenType::ELIF))) break;
+
+        size_t prevCursor = cursor_;
+        auto stmt = parseStatement();
+        if (stmt) {
+            block->statements.push_back(std::move(stmt));
         }
-        match(TokenType::DEDENT);
-    } else {
-        while (!isAtEnd() && !check(TokenType::END) && !check(TokenType::ELSE) && !check(TokenType::ELIF) && !check(TokenType::DEDENT)) {
-            skipNewlines();
-            if (check(TokenType::END) || check(TokenType::ELSE) || check(TokenType::ELIF) || isAtEnd()) break;
-            size_t prevCursor = cursor_;
-            auto stmt = parseStatement();
-            if (stmt) {
-                block->statements.push_back(std::move(stmt));
-            }
-            if (cursor_ == prevCursor && !isAtEnd()) {
-                advance();
-            }
+        if (cursor_ == prevCursor && !isAtEnd()) {
+            advance();
         }
-        match(TokenType::END);
     }
 
     return block;
@@ -281,6 +263,7 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
             return nullptr;
         }
         case TokenType::END: {
+            reportError("Kata kunci 'end' tidak terduga tanpa pembuka blok ('if', 'while', 'loop', atau 'def'/'fn')", peek(), "Hapus 'end' yang berlebih.", "Setiap kata kunci 'end' harus berpasangan dengan blok kontrol yang sesuai.");
             advance();
             return nullptr;
         }
@@ -450,62 +433,85 @@ std::unique_ptr<Stmt> Parser::parseUse() {
     return std::make_unique<UseStmt>(std::move(mod), line);
 }
 
-std::unique_ptr<Stmt> Parser::parseIf() {
+std::unique_ptr<Stmt> Parser::parseIf(bool isElif) {
     Token keywordTok = advance();
     int line = keywordTok.line;
     auto condition = parseExpression();
     if (!condition) {
         reportError("Expected condition expression after '" + keywordTok.lexeme + "'", peek());
     }
+    if (match(TokenType::THEN)) {}
     if (check(TokenType::NEWLINE)) advance();
-    auto thenBranch = parseBlock();
+    auto thenBranch = parseBlock(true);
     skipNewlines();
+
+    if (check(TokenType::END)) {
+        size_t lookahead = cursor_ + 1;
+        while (lookahead < tokens_.size() && tokens_[lookahead].type == TokenType::NEWLINE) lookahead++;
+        if (lookahead < tokens_.size() && (tokens_[lookahead].type == TokenType::ELSE || tokens_[lookahead].type == TokenType::ELIF)) {
+            advance();
+            skipNewlines();
+        }
+    }
+
     std::unique_ptr<BlockStmt> elseBranch = nullptr;
     if (check(TokenType::ELIF)) {
-        auto ifStmt = parseIf();
+        auto ifStmt = parseIf(true);
         auto blk = std::make_unique<BlockStmt>();
         blk->statements.push_back(std::move(ifStmt));
         elseBranch = std::move(blk);
     } else if (match(TokenType::ELSE)) {
         if (check(TokenType::IF) || check(TokenType::ELIF)) {
-            auto ifStmt = parseIf();
+            auto ifStmt = parseIf(true);
             auto blk = std::make_unique<BlockStmt>();
             blk->statements.push_back(std::move(ifStmt));
             elseBranch = std::move(blk);
         } else {
             if (check(TokenType::NEWLINE)) advance();
-            elseBranch = parseBlock();
+            elseBranch = parseBlock(false);
         }
     }
-    skipNewlines();
-    match(TokenType::END);
+
+    if (!isElif) {
+        skipNewlines();
+        if (!match(TokenType::END)) {
+            reportError("Diharapkan 'end' untuk menutup blok 'if'", peek(), "Tambahkan 'end' di akhir blok 'if'.", "Setiap blok kontrol 'if' wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+        }
+    }
     return std::make_unique<IfStmt>(std::move(condition), std::move(thenBranch), std::move(elseBranch), line);
 }
 
 std::unique_ptr<Stmt> Parser::parseLoop() {
     int line = advance().line;
     auto count = parseExpression();
+    if (match(TokenType::DO)) {}
     if (check(TokenType::NEWLINE)) advance();
-    auto body = parseBlock();
+    auto body = parseBlock(false);
     skipNewlines();
-    match(TokenType::END);
+    if (!match(TokenType::END)) {
+        reportError("Diharapkan 'end' untuk menutup blok 'loop'", peek(), "Tambahkan 'end' di akhir blok 'loop'.", "Setiap blok 'loop' wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+    }
     return std::make_unique<LoopStmt>(std::move(count), std::move(body), line);
 }
 
 std::unique_ptr<Stmt> Parser::parseWhile() {
     int line = advance().line;
     auto condition = parseExpression();
+    if (match(TokenType::DO)) {}
     if (check(TokenType::NEWLINE)) advance();
-    auto body = parseBlock();
+    auto body = parseBlock(false);
     skipNewlines();
-    match(TokenType::END);
+    if (!match(TokenType::END)) {
+        reportError("Diharapkan 'end' untuk menutup blok 'while'", peek(), "Tambahkan 'end' di akhir blok 'while'.", "Setiap blok 'while' wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+    }
     return std::make_unique<WhileStmt>(std::move(condition), std::move(body), line);
 }
 
 std::unique_ptr<Stmt> Parser::parseFnDecl() {
-    int line = advance().line;
+    Token keywordTok = advance();
+    int line = keywordTok.line;
     if (!check(TokenType::IDENTIFIER)) {
-        reportError("Diharapkan nama fungsi setelah 'def' atau 'fn'", peek());
+        reportError("Diharapkan nama fungsi setelah '" + keywordTok.lexeme + "'", peek());
         return nullptr;
     }
     std::string name = advance().lexeme;
@@ -538,10 +544,13 @@ std::unique_ptr<Stmt> Parser::parseFnDecl() {
     }
 
     functionArity_[name] = static_cast<int>(params.size());
+    if (match(TokenType::DO)) {}
     if (check(TokenType::NEWLINE)) advance();
-    auto body = parseBlock();
+    auto body = parseBlock(false);
     skipNewlines();
-    match(TokenType::END);
+    if (!match(TokenType::END)) {
+        reportError("Diharapkan 'end' untuk menutup fungsi '" + name + "'", peek(), "Tambahkan 'end' di akhir fungsi.", "Setiap deklarasi fungsi wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+    }
     return std::make_unique<FnDeclStmt>(std::move(name), std::move(params), std::move(body), line);
 }
 
@@ -576,20 +585,30 @@ std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {
         if (check(TokenType::LOOP)) {
             int loopLine = advance().line;
             auto count = parseExpression();
-            match(TokenType::NEWLINE);
-            auto body = parseBlock();
+            if (match(TokenType::DO)) {}
+            if (check(TokenType::NEWLINE)) advance();
+            auto body = parseBlock(false);
+            skipNewlines();
+            if (!match(TokenType::END)) {
+                reportError("Diharapkan 'end' untuk menutup loop expression", peek(), "Tambahkan 'end' di akhir blok.", "Setiap blok 'loop' wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+            }
             return std::make_unique<AssignStmt>(std::move(name), std::make_unique<LoopExpr>(std::move(count), std::move(body), loopLine), line);
         }
         if (check(TokenType::IF)) {
             int ifLine = advance().line;
             auto condition = parseExpression();
-            match(TokenType::NEWLINE);
-            auto thenBranch = parseBlock();
+            if (match(TokenType::THEN)) {}
+            if (check(TokenType::NEWLINE)) advance();
+            auto thenBranch = parseBlock(true);
             skipNewlines();
             std::unique_ptr<BlockStmt> elseBranch = nullptr;
             if (match(TokenType::ELSE)) {
-                match(TokenType::NEWLINE);
-                elseBranch = parseBlock();
+                if (check(TokenType::NEWLINE)) advance();
+                elseBranch = parseBlock(false);
+            }
+            skipNewlines();
+            if (!match(TokenType::END)) {
+                reportError("Diharapkan 'end' untuk menutup if expression", peek(), "Tambahkan 'end' di akhir blok.", "Setiap blok 'if' wajib ditutup dengan kata kunci 'end' (gaya Lua).");
             }
             return std::make_unique<AssignStmt>(std::move(name), std::make_unique<IfExpr>(std::move(condition), std::move(thenBranch), std::move(elseBranch), ifLine), line);
         }
@@ -623,8 +642,13 @@ std::unique_ptr<Stmt> Parser::parseAssignmentOrExpr() {
             std::string fnName = "$anon_" + std::to_string(anonFnCounter_++);
             functionArity_[fnName] = static_cast<int>(params.size());
             functionArity_[name] = static_cast<int>(params.size());
+            if (match(TokenType::DO)) {}
             if (check(TokenType::NEWLINE)) advance();
-            auto body = parseBlock();
+            auto body = parseBlock(false);
+            skipNewlines();
+            if (!match(TokenType::END)) {
+                reportError("Diharapkan 'end' untuk menutup fungsi anonim", peek(), "Tambahkan 'end' di akhir fungsi.", "Setiap fungsi anonim wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+            }
             hoistedAnonFns_.push_back(std::make_unique<FnDeclStmt>(fnName, params, std::make_unique<BlockStmt>(std::move(body->statements)), fnLine));
             return std::make_unique<AssignStmt>(std::move(name), std::make_unique<VarExpr>(fnName, fnLine), line);
         }

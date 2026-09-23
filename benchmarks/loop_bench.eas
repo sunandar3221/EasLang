@@ -1,9 +1,11 @@
-﻿fn sumLoop limit
+fn sumLoop limit
     total = 0
     i = 0
     while i < limit
         total = total + i
         i = i + 1
+    end
     total
+end
 
 print sumLoop 10000000

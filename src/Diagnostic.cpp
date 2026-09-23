@@ -210,7 +210,7 @@ const std::vector<std::string>& Diagnostic::getKeywords() {
         "while", "loop", "if", "elseif", "elif", "else", "print", "silent_print",
         "fn", "def", "func", "function", "return", "break", "continue",
         "use", "import", "include", "require", "new", "get", "set", "read", "write",
-        "send", "app", "window", "run", "end", "and", "or", "not", "true", "false",
+        "send", "app", "window", "run", "end", "then", "do", "and", "or", "not", "true", "false",
         "nil", "null"
     };
     return kws;

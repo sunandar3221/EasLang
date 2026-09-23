@@ -33,6 +33,6 @@ $(TARGET): $(SRCS)
 	@cp $(TARGET) $(ALIAS) 2>/dev/null || copy $(TARGET) $(ALIAS) 2>nul || true
 
 clean:
-	rm -f $(TARGET) $(ALIAS) *.o
+	@rm -f $(TARGET) $(ALIAS) *.o 2>/dev/null || del /Q /F $(TARGET) $(ALIAS) *.o 2>nul || true
 
 .PHONY: all clean

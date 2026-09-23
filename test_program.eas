@@ -24,26 +24,32 @@ if age >= 18
     print "Adult"
 else
     print "Child"
+end
 
 minorAge = 15
 if minorAge >= 18
     print "Adult"
 else
     print "Minor"
+end
 
 loop 3
     print "Loop item"
+end
 
 fn add a b
     a + b
+end
 print add 10 20
 
 fn multiply x y
     x * y
+end
 print multiply 6 7
 
 fn greet person
     "Hello " + person
+end
 print greet "EasLang"
 
 write "output_test.txt" "EasLang High-Performance File IO Completed"
