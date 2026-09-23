@@ -82,12 +82,44 @@ Value StandardLibrary::input(const std::string& prompt) {
 
 struct ManagedFileHandle {
     FILE* fp = nullptr;
-    std::vector<char> buffer;
+    std::string writeBuffer;
 };
 
 static std::unordered_map<int64_t, ManagedFileHandle> g_managedFiles;
 static int64_t g_nextManagedFileId = 1;
 static std::mutex g_managedFileMutex;
+static ManagedFileHandle* g_cachedHandle = nullptr;
+static int64_t g_cachedHandleId = -1;
+
+struct AutoAppendCache {
+    std::string path;
+    FILE* fp = nullptr;
+    std::string buffer;
+};
+static AutoAppendCache g_autoAppend;
+static std::mutex g_autoAppendMutex;
+
+static void flushAutoAppend() {
+    std::lock_guard<std::mutex> lock(g_autoAppendMutex);
+    if (g_autoAppend.fp) {
+        if (!g_autoAppend.buffer.empty()) {
+            fwrite(g_autoAppend.buffer.data(), 1, g_autoAppend.buffer.size(), g_autoAppend.fp);
+            g_autoAppend.buffer.clear();
+        }
+        fflush(g_autoAppend.fp);
+        fclose(g_autoAppend.fp);
+        g_autoAppend.fp = nullptr;
+        g_autoAppend.path.clear();
+    }
+}
+
+static void ensureAppendAtexitRegistered() {
+    static bool s_registered = false;
+    if (!s_registered) {
+        s_registered = true;
+        std::atexit(flushAutoAppend);
+    }
+}
 
 static std::string sanitizePath(const std::string& path) {
     std::string clean = path;
@@ -107,6 +139,9 @@ static std::string sanitizePath(const std::string& path) {
 Value StandardLibrary::readFile(const std::string& path) {
     std::string cleanPath = sanitizePath(path);
     if (cleanPath.empty()) return Value("");
+    if (g_autoAppend.fp && g_autoAppend.path == cleanPath) {
+        flushAutoAppend();
+    }
     FILE* fp = fopen(cleanPath.c_str(), "rb");
     if (!fp) {
         return Value("");
@@ -131,6 +166,9 @@ Value StandardLibrary::readFile(const std::string& path) {
 Value StandardLibrary::writeFile(const std::string& path, const std::string& content) {
     std::string cleanPath = sanitizePath(path);
     if (cleanPath.empty()) return Value(false);
+    if (g_autoAppend.fp && g_autoAppend.path == cleanPath) {
+        flushAutoAppend();
+    }
     FILE* fp = fopen(cleanPath.c_str(), "wb");
     if (!fp) {
         return Value(false);
@@ -147,17 +185,42 @@ Value StandardLibrary::writeFile(const std::string& path, const std::string& con
 Value StandardLibrary::appendFile(const std::string& path, const std::string& content) {
     std::string cleanPath = sanitizePath(path);
     if (cleanPath.empty()) return Value(false);
+
+    ensureAppendAtexitRegistered();
+    std::lock_guard<std::mutex> lock(g_autoAppendMutex);
+    if (g_autoAppend.fp && g_autoAppend.path == cleanPath) {
+        if (!content.empty()) {
+            g_autoAppend.buffer.append(content);
+            if (__builtin_expect(g_autoAppend.buffer.size() >= 524288, 0)) {
+                fwrite(g_autoAppend.buffer.data(), 1, g_autoAppend.buffer.size(), g_autoAppend.fp);
+                g_autoAppend.buffer.clear();
+            }
+        }
+        return Value(true);
+    }
+
+    if (g_autoAppend.fp) {
+        if (!g_autoAppend.buffer.empty()) {
+            fwrite(g_autoAppend.buffer.data(), 1, g_autoAppend.buffer.size(), g_autoAppend.fp);
+            g_autoAppend.buffer.clear();
+        }
+        fflush(g_autoAppend.fp);
+        fclose(g_autoAppend.fp);
+        g_autoAppend.fp = nullptr;
+        g_autoAppend.path.clear();
+    }
+
     FILE* fp = fopen(cleanPath.c_str(), "ab");
     if (!fp) {
         return Value(false);
     }
-    size_t written = 0;
+    g_autoAppend.fp = fp;
+    g_autoAppend.path = cleanPath;
+    g_autoAppend.buffer.reserve(524288);
     if (!content.empty()) {
-        written = fwrite(content.data(), 1, content.size(), fp);
+        g_autoAppend.buffer.append(content);
     }
-    fflush(fp);
-    fclose(fp);
-    return Value(written == content.size());
+    return Value(true);
 }
 
 Value StandardLibrary::writeLines(const std::string& path, const Value& listVal) {
@@ -166,16 +229,29 @@ Value StandardLibrary::writeLines(const std::string& path, const Value& listVal)
     }
     std::string cleanPath = sanitizePath(path);
     if (cleanPath.empty()) return Value(false);
+    if (g_autoAppend.fp && g_autoAppend.path == cleanPath) {
+        flushAutoAppend();
+    }
     FILE* fp = fopen(cleanPath.c_str(), "wb");
     if (!fp) {
         return Value(false);
     }
+    std::string chunk;
+    chunk.reserve(524288);
     for (const auto& item : *listVal.listVal) {
         std::string s = item.toString();
         if (!s.empty()) {
-            fwrite(s.data(), 1, s.size(), fp);
+            chunk.append(s);
         }
-        fputc('\n', fp);
+        chunk.push_back('\n');
+        if (__builtin_expect(chunk.size() >= 524288, 0)) {
+            fwrite(chunk.data(), 1, chunk.size(), fp);
+            chunk.clear();
+        }
+    }
+    if (!chunk.empty()) {
+        fwrite(chunk.data(), 1, chunk.size(), fp);
+        chunk.clear();
     }
     fflush(fp);
     fclose(fp);
@@ -185,6 +261,9 @@ Value StandardLibrary::writeLines(const std::string& path, const Value& listVal)
 Value StandardLibrary::openFile(const std::string& path, const std::string& mode) {
     std::string cleanPath = sanitizePath(path);
     if (cleanPath.empty()) return Value();
+    if (g_autoAppend.fp && g_autoAppend.path == cleanPath) {
+        flushAutoAppend();
+    }
     std::string actualMode = mode.empty() ? "w" : mode;
     if (actualMode.find('b') == std::string::npos && actualMode.find('+') == std::string::npos) {
         actualMode += "b";
@@ -197,7 +276,10 @@ Value StandardLibrary::openFile(const std::string& path, const std::string& mode
     int64_t handleId = g_nextManagedFileId++;
     ManagedFileHandle handle;
     handle.fp = fp;
+    handle.writeBuffer.reserve(524288);
     g_managedFiles[handleId] = std::move(handle);
+    g_cachedHandle = &g_managedFiles[handleId];
+    g_cachedHandleId = handleId;
 
     Value obj = Value::makeObject();
     obj.setProperty("__handle", Value(handleId));
@@ -208,25 +290,53 @@ Value StandardLibrary::openFile(const std::string& path, const std::string& mode
 }
 
 Value StandardLibrary::fileWrite(int64_t handleId, const std::string& content) {
-    std::lock_guard<std::mutex> lock(g_managedFileMutex);
-    auto it = g_managedFiles.find(handleId);
-    if (it == g_managedFiles.end() || !it->second.fp) {
-        return Value(false);
+    ManagedFileHandle* h = nullptr;
+    if (__builtin_expect(handleId == g_cachedHandleId && g_cachedHandle != nullptr, 1)) {
+        h = g_cachedHandle;
+    } else {
+        std::lock_guard<std::mutex> lock(g_managedFileMutex);
+        auto it = g_managedFiles.find(handleId);
+        if (it == g_managedFiles.end() || !it->second.fp) {
+            return Value(false);
+        }
+        g_cachedHandle = &it->second;
+        g_cachedHandleId = handleId;
+        h = g_cachedHandle;
     }
-    size_t written = fwrite(content.data(), 1, content.size(), it->second.fp);
-    return Value(written == content.size());
+
+    if (!content.empty()) {
+        h->writeBuffer.append(content);
+        if (__builtin_expect(h->writeBuffer.size() >= 524288, 0)) {
+            fwrite(h->writeBuffer.data(), 1, h->writeBuffer.size(), h->fp);
+            h->writeBuffer.clear();
+        }
+    }
+    return Value(true);
 }
 
 Value StandardLibrary::fileWriteLine(int64_t handleId, const std::string& line) {
-    std::lock_guard<std::mutex> lock(g_managedFileMutex);
-    auto it = g_managedFiles.find(handleId);
-    if (it == g_managedFiles.end() || !it->second.fp) {
-        return Value(false);
+    ManagedFileHandle* h = nullptr;
+    if (__builtin_expect(handleId == g_cachedHandleId && g_cachedHandle != nullptr, 1)) {
+        h = g_cachedHandle;
+    } else {
+        std::lock_guard<std::mutex> lock(g_managedFileMutex);
+        auto it = g_managedFiles.find(handleId);
+        if (it == g_managedFiles.end() || !it->second.fp) {
+            return Value(false);
+        }
+        g_cachedHandle = &it->second;
+        g_cachedHandleId = handleId;
+        h = g_cachedHandle;
     }
+
     if (!line.empty()) {
-        fwrite(line.data(), 1, line.size(), it->second.fp);
+        h->writeBuffer.append(line);
     }
-    fputc('\n', it->second.fp);
+    h->writeBuffer.push_back('\n');
+    if (__builtin_expect(h->writeBuffer.size() >= 524288, 0)) {
+        fwrite(h->writeBuffer.data(), 1, h->writeBuffer.size(), h->fp);
+        h->writeBuffer.clear();
+    }
     return Value(true);
 }
 
@@ -235,6 +345,10 @@ Value StandardLibrary::fileFlush(int64_t handleId) {
     auto it = g_managedFiles.find(handleId);
     if (it == g_managedFiles.end() || !it->second.fp) {
         return Value(false);
+    }
+    if (!it->second.writeBuffer.empty()) {
+        fwrite(it->second.writeBuffer.data(), 1, it->second.writeBuffer.size(), it->second.fp);
+        it->second.writeBuffer.clear();
     }
     fflush(it->second.fp);
     return Value(true);
@@ -246,7 +360,16 @@ Value StandardLibrary::fileClose(int64_t handleId) {
     if (it == g_managedFiles.end() || !it->second.fp) {
         return Value(false);
     }
+    if (!it->second.writeBuffer.empty()) {
+        fwrite(it->second.writeBuffer.data(), 1, it->second.writeBuffer.size(), it->second.fp);
+        it->second.writeBuffer.clear();
+    }
+    fflush(it->second.fp);
     fclose(it->second.fp);
+    if (g_cachedHandleId == handleId) {
+        g_cachedHandle = nullptr;
+        g_cachedHandleId = -1;
+    }
     g_managedFiles.erase(it);
     return Value(true);
 }

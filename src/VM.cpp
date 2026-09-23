@@ -798,9 +798,6 @@ Value VM::run(Chunk* chunk) {
                         ip = 0;
                         slots = nextSlots;
                     } else {
-                        std::vector<std::string> candidates;
-                        for (const auto& fn : functions_) candidates.push_back(fn.first);
-                        for (const auto& b : Diagnostic::getBuiltinFunctions()) candidates.push_back(b);
                         size_t dotPos = name.find('.');
                         if (dotPos != std::string::npos) {
                             std::string varName = name.substr(0, dotPos);
@@ -854,6 +851,10 @@ Value VM::run(Chunk* chunk) {
                                 runtimeError("NameError", "Fungsi '" + name + "' tidak ditemukan pada modul '" + mod + "'.", curChunk, ip, frameCount, "Apakah maksud Anda '" + mod + "." + memberMatch + "'?");
                             }
                         }
+
+                        std::vector<std::string> candidates;
+                        for (const auto& fn : functions_) candidates.push_back(fn.first);
+                        for (const auto& b : Diagnostic::getBuiltinFunctions()) candidates.push_back(b);
                         std::string fnMatch = Diagnostic::suggestSimilar(name, candidates);
                         std::string rec = fnMatch.empty() ? "" : "Apakah maksud Anda '" + fnMatch + "'?";
                         runtimeError("NameError", "Fungsi '" + name + "' tidak ditemukan.", curChunk, ip, frameCount, rec);

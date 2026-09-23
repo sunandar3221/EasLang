@@ -606,6 +606,23 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
             declaredVars_.insert(assign->name);
             ss << "Value var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
         } else {
+            std::vector<Expr*> appendParts;
+            Expr* curr = assign->value.get();
+            while (auto* b = dynamic_cast<BinaryExpr*>(curr)) {
+                if (b->op != TokenType::PLUS) break;
+                appendParts.push_back(b->right.get());
+                curr = b->left.get();
+            }
+            if (auto* rootVar = dynamic_cast<VarExpr*>(curr)) {
+                if (rootVar->name == assign->name && !appendParts.empty()) {
+                    std::reverse(appendParts.begin(), appendParts.end());
+                    for (size_t pi = 0; pi < appendParts.size(); ++pi) {
+                        if (pi > 0) emitIndent(ss);
+                        ss << "var_" << assign->name << ".append(" << generateExpr(appendParts[pi]) << ");\n";
+                    }
+                    return;
+                }
+            }
             ss << "var_" << assign->name << " = " << generateExpr(assign->value.get()) << ";\n";
         }
         return;
@@ -1047,6 +1064,26 @@ public:
         return Value(asInt() + other.asInt());
     }
 
+    void append(const Value& other) {
+        if (type == ValueType::STRING) {
+            if (other.type == ValueType::STRING) {
+                strVal.append(other.strVal);
+            } else {
+                strVal.append(other.toString());
+            }
+        } else if (type == ValueType::INT && other.type == ValueType::INT) {
+            intVal += other.intVal;
+            floatVal = static_cast<double>(intVal);
+        } else if (type == ValueType::LIST && other.type == ValueType::LIST) {
+            if (other.listVal) {
+                if (!listVal) listVal = std::make_shared<std::vector<Value>>();
+                listVal->insert(listVal->end(), other.listVal->begin(), other.listVal->end());
+            }
+        } else {
+            *this = *this + other;
+        }
+    }
+
     Value operator-(const Value& other) const {
         if (type == ValueType::FLOAT || other.type == ValueType::FLOAT) {
             return Value(asFloat() - other.asFloat());
@@ -1222,8 +1259,37 @@ public:
         return s;
     }
 
+    struct AotAppendCache {
+        std::string path;
+        FILE* fp = nullptr;
+        std::string buffer;
+    };
+
+    static AotAppendCache& getAotAppend() {
+        static AotAppendCache s_append;
+        return s_append;
+    }
+
+    static void flushAotAppend() {
+        auto& app = getAotAppend();
+        if (app.fp) {
+            if (!app.buffer.empty()) {
+                fwrite(app.buffer.data(), 1, app.buffer.size(), app.fp);
+                app.buffer.clear();
+            }
+            fflush(app.fp);
+            fclose(app.fp);
+            app.fp = nullptr;
+            app.path.clear();
+        }
+    }
+
     static Value readFile(const std::string& path) {
         std::string cleanPath = sanitizePath(path);
+        auto& app = getAotAppend();
+        if (app.fp && app.path == cleanPath) {
+            flushAotAppend();
+        }
         FILE* fp = fopen(cleanPath.c_str(), "rb");
         if (!fp) return Value("");
         fseek(fp, 0, SEEK_END);
@@ -1240,6 +1306,10 @@ public:
 
     static Value writeFile(const std::string& path, const std::string& content) {
         std::string cleanPath = sanitizePath(path);
+        auto& app = getAotAppend();
+        if (app.fp && app.path == cleanPath) {
+            flushAotAppend();
+        }
         FILE* fp = fopen(cleanPath.c_str(), "wb");
         if (!fp) return Value(false);
         size_t written = 0;
@@ -1253,15 +1323,38 @@ public:
 
     static Value appendFile(const std::string& path, const std::string& content) {
         std::string cleanPath = sanitizePath(path);
+        if (cleanPath.empty()) return Value(false);
+
+        static bool s_atexitReg = false;
+        if (!s_atexitReg) {
+            s_atexitReg = true;
+            std::atexit(flushAotAppend);
+        }
+
+        auto& app = getAotAppend();
+        if (app.fp && app.path == cleanPath) {
+            if (!content.empty()) {
+                app.buffer.append(content);
+                if (app.buffer.size() >= 524288) {
+                    fwrite(app.buffer.data(), 1, app.buffer.size(), app.fp);
+                    app.buffer.clear();
+                }
+            }
+            return Value(true);
+        }
+
+        flushAotAppend();
+
         FILE* fp = fopen(cleanPath.c_str(), "ab");
         if (!fp) return Value(false);
-        size_t written = 0;
+
+        app.fp = fp;
+        app.path = cleanPath;
+        app.buffer.reserve(524288);
         if (!content.empty()) {
-            written = fwrite(content.data(), 1, content.size(), fp);
+            app.buffer.append(content);
         }
-        fflush(fp);
-        fclose(fp);
-        return Value(written == content.size());
+        return Value(true);
     }
 
     static Value writeLines(const std::string& path, const Value& listVal) {
@@ -1269,18 +1362,33 @@ public:
         std::string cleanPath = sanitizePath(path);
         FILE* fp = fopen(cleanPath.c_str(), "wb");
         if (!fp) return Value(false);
+        std::string chunk;
+        chunk.reserve(524288);
         for (const auto& item : *listVal.listVal) {
             std::string s = item.toString();
-            if (!s.empty()) fwrite(s.data(), 1, s.size(), fp);
-            fputc('\n', fp);
+            if (!s.empty()) chunk.append(s);
+            chunk.push_back('\n');
+            if (chunk.size() >= 524288) {
+                fwrite(chunk.data(), 1, chunk.size(), fp);
+                chunk.clear();
+            }
+        }
+        if (!chunk.empty()) {
+            fwrite(chunk.data(), 1, chunk.size(), fp);
+            chunk.clear();
         }
         fflush(fp);
         fclose(fp);
         return Value(true);
     }
 
-    static std::unordered_map<int64_t, FILE*>& getAotFiles() {
-        static std::unordered_map<int64_t, FILE*> s_files;
+    struct AotFileHandle {
+        FILE* fp = nullptr;
+        std::string writeBuffer;
+    };
+
+    static std::unordered_map<int64_t, AotFileHandle>& getAotFiles() {
+        static std::unordered_map<int64_t, AotFileHandle> s_files;
         return s_files;
     }
 
@@ -1292,7 +1400,10 @@ public:
         if (!fp) return Value();
         static int64_t s_id = 1;
         int64_t hid = s_id++;
-        getAotFiles()[hid] = fp;
+        AotFileHandle handle;
+        handle.fp = fp;
+        handle.writeBuffer.reserve(524288);
+        getAotFiles()[hid] = std::move(handle);
 
         Value obj = Value::makeObject();
         obj.setProperty("__handle", Value(hid));
@@ -1305,33 +1416,52 @@ public:
     static Value fileWrite(int64_t handleId, const std::string& content) {
         auto& files = getAotFiles();
         auto it = files.find(handleId);
-        if (it == files.end() || !it->second) return Value(false);
-        size_t written = fwrite(content.data(), 1, content.size(), it->second);
-        return Value(written == content.size());
+        if (it == files.end() || !it->second.fp) return Value(false);
+        if (!content.empty()) {
+            it->second.writeBuffer.append(content);
+            if (it->second.writeBuffer.size() >= 524288) {
+                fwrite(it->second.writeBuffer.data(), 1, it->second.writeBuffer.size(), it->second.fp);
+                it->second.writeBuffer.clear();
+            }
+        }
+        return Value(true);
     }
 
     static Value fileWriteLine(int64_t handleId, const std::string& line) {
         auto& files = getAotFiles();
         auto it = files.find(handleId);
-        if (it == files.end() || !it->second) return Value(false);
-        if (!line.empty()) fwrite(line.data(), 1, line.size(), it->second);
-        fputc('\n', it->second);
+        if (it == files.end() || !it->second.fp) return Value(false);
+        if (!line.empty()) it->second.writeBuffer.append(line);
+        it->second.writeBuffer.push_back('\n');
+        if (it->second.writeBuffer.size() >= 524288) {
+            fwrite(it->second.writeBuffer.data(), 1, it->second.writeBuffer.size(), it->second.fp);
+            it->second.writeBuffer.clear();
+        }
         return Value(true);
     }
 
     static Value fileFlush(int64_t handleId) {
         auto& files = getAotFiles();
         auto it = files.find(handleId);
-        if (it == files.end() || !it->second) return Value(false);
-        fflush(it->second);
+        if (it == files.end() || !it->second.fp) return Value(false);
+        if (!it->second.writeBuffer.empty()) {
+            fwrite(it->second.writeBuffer.data(), 1, it->second.writeBuffer.size(), it->second.fp);
+            it->second.writeBuffer.clear();
+        }
+        fflush(it->second.fp);
         return Value(true);
     }
 
     static Value fileClose(int64_t handleId) {
         auto& files = getAotFiles();
         auto it = files.find(handleId);
-        if (it == files.end() || !it->second) return Value(false);
-        fclose(it->second);
+        if (it == files.end() || !it->second.fp) return Value(false);
+        if (!it->second.writeBuffer.empty()) {
+            fwrite(it->second.writeBuffer.data(), 1, it->second.writeBuffer.size(), it->second.fp);
+            it->second.writeBuffer.clear();
+        }
+        fflush(it->second.fp);
+        fclose(it->second.fp);
         files.erase(it);
         return Value(true);
     }

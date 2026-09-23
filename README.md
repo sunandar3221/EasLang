@@ -60,9 +60,9 @@ Seluruh berkas binary resmi Fasthon otomatis dikompilasi oleh **GitHub Actions C
    > - Memasang binary langsung ke `/usr/local/bin/fasthon` (atau `~/.local/bin/fasthon`).
 
 3. **Verifikasi Instalasi**:
-   Ketik perintah `fasthon` (alias `eas`) untuk masuk ke interactive REPL:
+   Ketik perintah `fasthon` untuk masuk ke interactive REPL:
    ```bash
-   eas
+   fasthon
    ```
    Atau buat dan jalankan skrip pertama Anda:
    ```bash
@@ -86,13 +86,13 @@ Fasthon dapat berjalan secara native dan berkecepatan penuh di smartphone Androi
    curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash
    ```
    > 💡 **Kelebihan di Termux:**
-   > - Mengunduh binary native Android Bionic (`eas-android-arm64`) yang dikompilasi langsung menggunakan Google Android NDK Clang.
+   > - Mengunduh binary native Android Bionic (`fasthon-android-arm64`) yang dikompilasi langsung menggunakan Google Android NDK Clang.
    > - Otomatis terpasang ke `$PREFIX/bin/fasthon` sehingga tidak butuh akses root/sudo sama sekali.
 
 4. **Verifikasi Instalasi**:
    Ketik perintah berikut di Termux:
    ```bash
-   eas
+   fasthon
    ```
 5. **Coba Jalankan Skrip Pertama di Android**:
    ```bash
@@ -112,11 +112,11 @@ Buka PowerShell (tekan `Win + X` lalu pilih Terminal/PowerShell) dan jalankan:
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/sunandar3221/Fasthon/releases/latest/download/fasthon.exe" -OutFile "$HOME\AppData\Local\Microsoft\WindowsApps\fasthon.exe"
 ```
-> ✨ Direktori `WindowsApps` sudah otomatis terdaftar di `PATH` Windows, sehingga Anda dapat langsung mengetik `fasthon` (alias `eas`) atau `fasthon.exe` dari folder/terminal mana saja tanpa perlu setting Environment Variables secara manual!
+> ✨ Direktori `WindowsApps` sudah otomatis terdaftar di `PATH` Windows, sehingga Anda dapat langsung mengetik `fasthon` atau `fasthon.exe` dari folder/terminal mana saja tanpa perlu setting Environment Variables secara manual!
 
 #### Opsi 2: Unduh Manual dari GitHub Releases
 1. Kunjungi [Halaman Rilis GitHub Fasthon](https://github.com/sunandar3221/Fasthon/releases/latest).
-2. Unduh berkas **`fasthon.exe`** (atau `eas-windows-x64.exe`).
+2. Unduh berkas **`fasthon.exe`** (atau `fasthon-windows-x64.exe`).
 3. Simpan berkas di folder pilihan Anda (misal `C:\Fasthon\fasthon.exe`).
 4. *(Opsional)* Tambahkan folder tersebut ke `PATH` di Environment Variables Windows.
 5. Buka Command Prompt (CMD) atau PowerShell, lalu jalankan:
@@ -152,7 +152,7 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code Fast
 ### Bab 1: Output, Variabel Dinamis, String Interpolation & Komentar
 Di Fasthon, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan variabel di dalam string dapat ditulis langsung menggunakan **String Interpolation** (`${variabel}` atau `$variabel`), multi-argumen dengan spasi pemisah, maupun penggabungan string (`+`). Komentar dapat ditulis menggunakan `#` (gaya Python/Ruby) maupun `//` (gaya C/JavaScript):
 
-```eas
+```fasthon
 # Ini adalah komentar satu baris gaya Python
 // Ini adalah komentar satu baris gaya C/JS
 
@@ -181,7 +181,7 @@ print("Halo Dunia")
 ### Bab 2: Operasi Aritmatika & Ekspresi
 Fasthon mendukung operator standar `+`, `-`, `*`, `/`, `%` dengan prioritas matematis yang benar serta pengelompokan menggunakan tanda kurung `()`:
 
-```eas
+```fasthon
 val1 = 100
 val2 = 25
 sum = val1 + val2
@@ -198,7 +198,7 @@ print quot
 ### Bab 3: List / Array Dinamis (`push`, `pop`, `len`)
 List dideklarasikan dengan kurung siku `[]` dan diakses menggunakan indeks berbasis nol `[i]`. Tersedia fungsi bawaan `len(list)` untuk mengetahui panjang list, `push(list, item)` untuk menambah elemen, dan `pop(list)` untuk mengambil elemen terakhir:
 
-```eas
+```fasthon
 buah = ["Apel", "Jeruk"]
 
 # Menambah elemen baru ke list
@@ -222,7 +222,7 @@ Percabangan menggunakan kata kunci `if`, `elseif` (atau `elif`), dan `else` berb
 
 #### 1. Percabangan Bersarang & Multikondisi (`elseif` / `elif`)
 Anda dapat menggunakan `elseif` maupun `elif` untuk mengecek banyak kondisi secara berurutan:
-```eas
+```fasthon
 nilai = 85
 
 if nilai >= 90
@@ -237,7 +237,7 @@ else
 
 #### 2. If Expression (Menugaskan Nilai Percabangan ke Variabel)
 Hasil evaluasi `if` dapat ditugaskan langsung ke sebuah variabel sebagai ekspresi yang sangat bersih (*clean ternary*):
-```eas
+```fasthon
 nilai = 85
 
 status = if nilai >= 75
@@ -255,7 +255,7 @@ Fasthon menyediakan fungsi bawaan untuk membedakan maupun menyamakan perbandinga
 - **`lower(teks)`**: Mengubah teks menjadi huruf kecil (*lowercase*).
 - **`upper(teks)`**: Mengubah teks menjadi huruf besar kapital (*uppercase*).
 
-```eas
+```fasthon
 nama = "Agus"
 
 # Menyamakan huruf kapital dan non-kapital (Incase Sensitive)
@@ -279,7 +279,7 @@ print upper("halo dunia")  # Output: HALO DUNIA
 - Gunakan `break` untuk keluar dari loop seketika.
 - Gunakan `continue` untuk melompati sisa iterasi saat ini dan lanjut ke iterasi berikutnya.
 
-```eas
+```fasthon
 # Perulangan loop terhitung
 loop 3
     print "Pengulangan loop"
@@ -298,7 +298,7 @@ while true
 #### Loop Assignment & `silent_print`
 Hasil evaluasi `loop` dapat ditugaskan langsung ke variabel untuk mengumpulkan seluruh outputnya. Gunakan `silent_print` agar memformat dan menampung baris teks tanpa membanjiri layar terminal (karena operasi berkas memerlukan `io`, pastikan memuat `use io`):
 
-```eas
+```fasthon
 use io
 
 halo = loop 3000
@@ -312,7 +312,7 @@ Fungsi dapat dideklarasikan dengan `fn`, `def`, `func`, maupun `function`, diiku
 - **Implicit & Explicit Return**: Baris terakhir otomatis menjadi nilai balik fungsi, ATAU Anda dapat menggunakan kata kunci `return` untuk mengembalikan nilai secara eksplisit / keluar lebih awal (*early exit*).
 - **Fleksibilitas Pemanggilan**: Fungsi dapat dipanggil dengan gaya perintah `add 10 20` maupun gaya kurung `add(10, 20)`.
 
-```eas
+```fasthon
 # Menggunakan kata kunci 'fn' dengan implicit return
 fn add a b
     a + b
@@ -334,7 +334,7 @@ print cekStatus(20) # Output: Adult
 #### Memasukkan Fungsi ke Variabel (First-Class Functions)
 Fungsi di Fasthon dapat disimpan ke dalam variabel dan dideklarasikan secara dinamis:
 
-```eas
+```fasthon
 operasi = add
 print operasi 15 25
 
@@ -347,7 +347,7 @@ print kali 4 5
 ### Bab 7: Pustaka I/O & Input Interaktif (`use io` / `import io`)
 Untuk menggunakan fitur input-output berkas dan interaksi pengguna, Anda **wajib** memuat pustaka `io` terlebih dahulu menggunakan `use io` atau `import io` (seperti halnya di Python):
 
-```eas
+```fasthon
 use io
 
 nama = io.input("Siapa nama kamu? ")
@@ -364,7 +364,7 @@ print isi
 ### Bab 8: Objek, State Management & Dot Notation (`new`, `set`, `get`)
 Buat objek map/state baru dengan `new`, atur properti dengan `set`, dan ambil nilainya dengan `get` atau notasi titik (`.`):
 
-```eas
+```fasthon
 person = new
 set person "role" "Engineer"
 set person "level" "Senior"
@@ -379,7 +379,7 @@ set person "sapa" (fn nama
 ### Bab 9: Jaringan & HTTP Client (`use net`, `net.get`, `net.send`)
 Permintaan HTTP GET dapat dilakukan langsung dengan memuat library `net`:
 
-```eas
+```fasthon
 use net
 
 response = net.get "httpbin.org"
@@ -389,7 +389,7 @@ print response
 ### Bab 10: Aplikasi Desktop Native Win32 (`use gui`, `app`, `window`, `run`)
 Membangun antarmuka jendela desktop native secara langsung:
 
-```eas
+```fasthon
 use gui
 
 app "Aplikasi Saya"
@@ -412,7 +412,7 @@ Fasthon menyertakan pustaka standar bawaan berkecepatan tinggi:
 - **`gui`**: Antarmuka grafis desktop native Win32 (`gui.app`, `gui.window`, `gui.run`).
 
 Contoh pemanggilan pustaka standar:
-```eas
+```fasthon
 import io
 import math
 import time
@@ -432,7 +432,7 @@ Membuat library di Fasthon sangat sederhana. Anda cukup membuat berkas `.fsn` ba
 
 ##### Langkah 1: Buat Berkas Library (Contoh: `kalkulator.fsn`)
 Simpan file ini dengan nama `kalkulator.fsn`:
-```eas
+```fasthon
 phi = 3.14159
 
 fn tambah a b
@@ -453,7 +453,7 @@ fn luas_lingkaran r
 
 > 💡 **Tips Pengorganisasian dengan Objek (Namespacing):**
 > Anda juga dapat membungkus fungsi-fungsi library ke dalam suatu objek:
-> ```eas
+> ```fasthon
 > sapaFn = fn nama
 >     "Halo " + nama
 > 
@@ -468,7 +468,7 @@ Gunakan perintah `import` atau `use` pada skrip utama Anda.
 
 ##### Langkah 2: Buat Skrip Utama (Contoh: `main.fsn`)
 Simpan di direktori yang sama dengan `kalkulator.fsn`:
-```eas
+```fasthon
 use io
 import "kalkulator"
 
@@ -504,7 +504,7 @@ Fasthon menyediakan fungsi bawaan global tingkat sistem yang dapat digunakan lan
 - **`int(val)`**: Mengonversi nilai angka/string menjadi integer 64-bit.
 - **`float(val)`**: Mengonversi nilai menjadi floating-point presisi ganda (64-bit float).
 
-```eas
+```fasthon
 teks = "123"
 angka = int(teks)
 desimal = float("3.1415")
@@ -517,7 +517,7 @@ print hasilGabung
 - **`push(list, val)`**: Menambahkan elemen ke urutan terakhir list.
 - **`pop(list)`**: Mengambil dan menghapus elemen terakhir list.
 
-```eas
+```fasthon
 # Mengetahui panjang string & list
 print len("Fasthon")          # Output: 7
 
@@ -533,10 +533,10 @@ print pop(daftar)             # Output: 30
 - **`case_sensitive(a, b)`**: Memeriksa apakah dua teks sama persis dengan membedakan huruf kapital.
 - **`incase_sensitive(a, b)`**: Memeriksa apakah dua teks sama dengan menyamakan huruf kapital/non-kapital (*case-insensitive*).
 
-```eas
+```fasthon
 kalimat = "Belajar Fasthon"
-print lower(kalimat)          # Output: belajar easlang
-print upper(kalimat)          # Output: BELAJAR EASLANG
+print lower(kalimat)          # Output: belajar fasthon
+print upper(kalimat)          # Output: BELAJAR FASTHON
 
 user1 = "admin"
 user2 = "ADMIN"
@@ -578,7 +578,7 @@ Modul `math` menyediakan fungsi-fungsi perhitungan matematika berkecepatan tingg
 ##### B. Contoh Praktis: Mengontrol Random Seed & Game Tebak Angka
 Secara default, saat Anda menjalankan Fasthon, generator angka acak **otomatis menggunakan entropi perangkat keras** sehingga setiap kali program dijalankan, angka tebakan akan selalu berbeda dan tidak bisa diprediksi. Namun jika Anda membutuhkan hasil yang konsisten (misalnya saat testing), Anda dapat menetapkan seed secara manual:
 
-```eas
+```fasthon
 use io
 use math
 
@@ -595,7 +595,7 @@ angkaRahasia = math.random(1, 100)
 selesai = false
 percobaan = 0
 
-print "🎯 GAME TEBAK ANGKA RESMI EASLANG"
+print "🎯 GAME TEBAK ANGKA RESMI FASTHON"
 print "Komputer telah memilih angka acak antara 1 s.d. 100!"
 
 while selesai == false
@@ -670,7 +670,7 @@ Modul `time` berguna untuk mengukur performa baris kode (profiling / stopwatch),
 | `time.sleep(ms)` | Menghentikan sementara (*pause*) eksekusi program selama $ms$ milidetik | `time.sleep 1000` *(jeda 1 detik)* |
 
 ##### B. Contoh Praktis: Pengukur Durasi Eksekusi & Hitung Mundur
-```eas
+```fasthon
 use io
 use time
 
@@ -707,7 +707,7 @@ Modul `net` (bisa juga diakses dengan alias `http`) memungkinkan program Fasthon
 | `net.send(url, payload)` *(atau `http.send`)* | Mengirimkan data teks/payload via HTTP POST ke endpoint tujuan | `res = net.send "api.site/data" "key=val"` |
 
 ##### B. Contoh Praktis: Mengambil Data dari REST API
-```eas
+```fasthon
 use io
 use net
 
@@ -730,7 +730,7 @@ Modul `gui` menyediakan API minimalis berkinerja tinggi untuk memunculkan antarm
 | `gui.run(timeout_ms)` *(atau `run`)* | Menjalankan message loop native. Jika diberi parameter milidetik, jendela akan otomatis tertutup setelah waktu habis | `gui.run 3000` *(tampil selama 3 detik)* |
 
 ##### B. Contoh Praktis: Memunculkan Jendela GUI Desktop
-```eas
+```fasthon
 use io
 use gui
 
@@ -751,13 +751,13 @@ Meskipun fungsi manipulasi teks umum tersedia secara global, modul `str` menyedi
 ##### A. Kamus Fungsi Modul `str`
 | Fungsi | Penjelasan | Contoh Penggunaan |
 | :--- | :--- | :--- |
-| `str.lower(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kecil | `str.lower("Fasthon")` $\rightarrow$ `"easlang"` |
-| `str.upper(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kapital | `str.upper("Fasthon")` $\rightarrow$ `"EASLANG"` |
+| `str.lower(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kecil | `str.lower("Fasthon")` $\rightarrow$ `"fasthon"` |
+| `str.upper(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kapital | `str.upper("Fasthon")` $\rightarrow$ `"FASTHON"` |
 | `str.case_sensitive(a, b)` | Membandingkan kecocokan dua teks secara ketat dengan membedakan huruf besar/kecil | `str.case_sensitive("A", "a")` $\rightarrow$ `false` |
 | `str.incase_sensitive(a, b)` | Membandingkan kecocokan dua teks tanpa mempedulikan huruf besar/kecil (*case-insensitive*) | `str.incase_sensitive("Admin", "admin")` $\rightarrow$ `true` |
 
 ##### B. Contoh Praktis: Validasi Autentikasi Form
-```eas
+```fasthon
 use io
 use str
 
@@ -1013,11 +1013,11 @@ fasthon build game.fsn --target windows -o game.exe
 > 💡 Anda juga dapat menggunakan flag shortcut seperti `--linux`, `--android`, atau `--windows`.
 
 ### 3. Mode Interaktif (Interactive REPL)
-Jalankan `fasthon` (alias `eas`) tanpa argumen untuk masuk ke interactive shell:
+Jalankan `fasthon` tanpa argumen untuk masuk ke interactive shell:
 
 ```bash
 # Di Linux & Android (Termux):
-eas
+fasthon
 
 # Di Windows:
 .\fasthon.exe
