@@ -4,6 +4,7 @@
 #include "StandardLibrary.hpp"
 #include <fstream>
 #include <cstdlib>
+#include <algorithm>
 
 AotGenerator::AotGenerator() : indentLevel_(0), loopCounter_(0) {}
 
@@ -615,9 +616,8 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
             }
             if (auto* rootVar = dynamic_cast<VarExpr*>(curr)) {
                 if (rootVar->name == assign->name && !appendParts.empty()) {
-                    std::reverse(appendParts.begin(), appendParts.end());
-                    for (size_t pi = 0; pi < appendParts.size(); ++pi) {
-                        if (pi > 0) emitIndent(ss);
+                    for (int pi = static_cast<int>(appendParts.size()) - 1; pi >= 0; --pi) {
+                        if (pi < static_cast<int>(appendParts.size()) - 1) emitIndent(ss);
                         ss << "var_" << assign->name << ".append(" << generateExpr(appendParts[pi]) << ");\n";
                     }
                     return;
