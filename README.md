@@ -975,6 +975,21 @@ eas build game.eas -o game.exe
 .\game.exe
 ```
 
+#### 🌐 Target Selection & Cross-Compilation (`--target`):
+Anda dapat secara eksplisit memilih target platform binary yang ingin dihasilkan menggunakan opsi `--target`:
+
+```bash
+# Build untuk Linux (ELF Binary):
+eas build game.eas --target linux -o game
+
+# Build untuk Android ARM64 (ELF Binary):
+eas build game.eas --target android -o game
+
+# Build untuk Windows (.exe):
+eas build game.eas --target windows -o game.exe
+```
+> 💡 Anda juga dapat menggunakan flag shortcut seperti `--linux`, `--android`, atau `--windows`.
+
 ### 3. Mode Interaktif (Interactive REPL)
 Jalankan `eas` tanpa argumen untuk masuk ke interactive shell:
 
@@ -989,7 +1004,7 @@ Ketik `exit` untuk keluar dari REPL.
 
 ---
 
-## 7. Lisensi
+## 8. Lisensi
 
 Proyek ini dirilis di bawah lisensi terbuka **MIT License**. Lihat berkas [`LICENSE`](LICENSE) untuk informasi lebih lanjut.
 

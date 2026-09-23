@@ -23,40 +23,46 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     if (arg1 == "-h" || arg1 == "--help" || arg1 == "help") {
-        std::cout << "Usage: eas [script.eas] | build <script.eas> [-o output] | --version\n";
+        std::cout << "Usage: eas [script.eas] | build <script.eas> [-o output] [--target <windows|linux|android>] | --version\n";
         return 0;
     }
 
     if (arg1 == "build" || arg1 == "-c" || arg1 == "--compile") {
         if (argc < 3) {
-#ifdef _WIN32
-            std::cerr << "Usage: eas build <input.eas> [-o <output.exe>]\n";
-#else
-            std::cerr << "Usage: eas build <input.eas> [-o <output>]\n";
-#endif
+            std::cerr << "Usage: eas build <input.eas> [-o <output>] [--target <windows|linux|android>]\n";
             return 1;
         }
 
         std::string inputFile;
         std::string outputFile;
+        std::string target;
 
         for (int i = 2; i < argc; ++i) {
             std::string arg = argv[i];
             if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
                 outputFile = argv[++i];
+            } else if ((arg == "-t" || arg == "--target") && i + 1 < argc) {
+                target = argv[++i];
+            } else if (arg.rfind("--target=", 0) == 0) {
+                target = arg.substr(9);
+            } else if (arg == "--linux") {
+                target = "linux";
+            } else if (arg == "--android" || arg == "--termux") {
+                target = "android";
+            } else if (arg == "--windows" || arg == "--win") {
+                target = "windows";
             } else if (inputFile.empty() && !arg.empty() && arg[0] != '-') {
                 inputFile = arg;
             }
         }
 
         if (inputFile.empty()) {
-#ifdef _WIN32
-            std::cerr << "Usage: eas build <input.eas> [-o <output.exe>]\n";
-#else
-            std::cerr << "Usage: eas build <input.eas> [-o <output>]\n";
-#endif
+            std::cerr << "Usage: eas build <input.eas> [-o <output>] [--target <windows|linux|android>]\n";
             return 1;
         }
+
+        std::string normTarget = target;
+        for (char& c : normTarget) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
         if (outputFile.empty()) {
             std::string base = inputFile;
@@ -65,11 +71,17 @@ int main(int argc, char* argv[]) {
             if (base.size() > 4 && base.substr(base.size() - 4) == ".eas") {
                 base = base.substr(0, base.size() - 4);
             }
+            if (normTarget == "windows" || normTarget == "win" || normTarget == "win64") {
+                outputFile = base + ".exe";
+            } else if (normTarget == "linux" || normTarget == "android" || normTarget == "termux") {
+                outputFile = base;
+            } else {
 #ifdef _WIN32
-            outputFile = base + ".exe";
+                outputFile = base + ".exe";
 #else
-            outputFile = base;
+                outputFile = base;
 #endif
+            }
         }
 
         Value content = StandardLibrary::readFile(inputFile);
@@ -110,14 +122,15 @@ int main(int argc, char* argv[]) {
         outCpp << cppCode;
         outCpp.close();
 
-        bool ok = aot.buildBinary(tempCpp, outputFile);
+        bool ok = aot.buildBinary(tempCpp, outputFile, target);
         std::remove(tempCpp.c_str());
         if (!ok) {
             std::cerr << "Error: AOT Compilation failed.\n";
             return 1;
         }
 
-        std::cout << "Successfully compiled " << inputFile << " -> " << outputFile << "\n";
+        std::string targetMsg = target.empty() ? "" : (" (" + target + ")");
+        std::cout << "Successfully compiled " << inputFile << " -> " << outputFile << targetMsg << "\n";
         return 0;
     }
 

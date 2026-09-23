@@ -1301,45 +1301,197 @@ public:
 )EAS_AOT_RUNTIME";
 }
 
-bool AotGenerator::buildBinary(const std::string& sourceFile, const std::string& outputFile) {
-    std::string compiler;
-    const char* envCxx = std::getenv("CXX");
-    if (envCxx && *envCxx) {
-        compiler = envCxx;
-    } else {
-#ifdef _WIN32
-        compiler = "g++";
-#else
-        if (std::system("which clang++ > /dev/null 2>&1") == 0) {
-            compiler = "clang++";
-        } else if (std::system("which g++ > /dev/null 2>&1") == 0) {
-            compiler = "g++";
+bool AotGenerator::buildBinary(const std::string& sourceFile, const std::string& outputFile, const std::string& target) {
+    std::string normTarget = target;
+    for (char& c : normTarget) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    if (normTarget.empty()) {
+        if (outputFile.size() >= 4 && outputFile.substr(outputFile.size() - 4) == ".exe") {
+            normTarget = "windows";
         } else {
-            compiler = "c++";
+#ifdef _WIN32
+            normTarget = "windows";
+#else
+            normTarget = "linux";
+#endif
+        }
+    }
+
+    bool isWindows = (normTarget == "windows" || normTarget == "win" || normTarget == "win64" || normTarget == "windows-x64");
+    bool isAndroid = (normTarget == "android" || normTarget == "android-arm64" || normTarget == "termux" || normTarget == "arm64" || normTarget == "aarch64");
+    bool isLinux = (!isWindows && !isAndroid);
+
+    auto hasCommand = [](const std::string& cmd) -> bool {
+#ifdef _WIN32
+        std::string test = "where.exe " + cmd + " > nul 2>&1";
+        if (std::system(test.c_str()) == 0) return true;
+        std::string testRun = cmd + " --version > nul 2>&1";
+        return std::system(testRun.c_str()) == 0;
+#else
+        std::string test = "which " + cmd + " > /dev/null 2>&1";
+        return std::system(test.c_str()) == 0;
+#endif
+    };
+
+    int res = -1;
+
+    if (isWindows) {
+#ifdef _WIN32
+        std::string compiler = "g++";
+        const char* envCxx = std::getenv("CXX");
+        if (envCxx && *envCxx) {
+            compiler = envCxx;
+        } else if (hasCommand("clang++")) {
+            compiler = "clang++";
+        }
+        std::string cmd = compiler + " -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
+        res = std::system(cmd.c_str());
+        if (res != 0) {
+            std::string fallbackCmd = compiler + " -std=c++20 -O3 " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
+            res = std::system(fallbackCmd.c_str());
+        }
+#else
+        std::string winCompiler;
+        if (hasCommand("x86_64-w64-mingw32-g++")) {
+            winCompiler = "x86_64-w64-mingw32-g++";
+        } else if (hasCommand("zig")) {
+            winCompiler = "zig c++ -target x86_64-windows-gnu";
+        }
+
+        if (!winCompiler.empty()) {
+            std::string cmd = winCompiler + " -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
+            res = std::system(cmd.c_str());
+        } else {
+            std::cerr << "Error: Compiler cross-compile ke target Windows (x86_64-w64-mingw32-g++ atau zig) tidak ditemukan.\n";
+            std::remove(sourceFile.c_str());
+            return false;
+        }
+#endif
+    } else if (isAndroid) {
+#ifdef __ANDROID__
+        std::string compiler = "clang++";
+        const char* envCxx = std::getenv("CXX");
+        if (envCxx && *envCxx) compiler = envCxx;
+        std::string cmd = compiler + " -std=c++20 -O3 -flto " + sourceFile + " -lm -o " + outputFile + " 2>/dev/null";
+        res = std::system(cmd.c_str());
+        if (res != 0) {
+            std::string fallbackCmd = compiler + " -std=c++20 -O3 " + sourceFile + " -lm -o " + outputFile;
+            res = std::system(fallbackCmd.c_str());
+        }
+        if (res == 0) {
+            (void)std::system(("chmod +x " + outputFile + " 2>/dev/null").c_str());
+        }
+#else
+        std::string androidCompiler;
+        std::string ndkDir;
+        const char* ndkEnv = std::getenv("ANDROID_NDK_ROOT");
+        if (!ndkEnv || !*ndkEnv) ndkEnv = std::getenv("ANDROID_NDK_HOME");
+        if (ndkEnv && *ndkEnv) ndkDir = ndkEnv;
+
+#ifndef _WIN32
+        if (ndkDir.empty()) {
+            FILE* p = popen("find /usr/local/lib/android/sdk/ndk -maxdepth 1 -mindepth 1 2>/dev/null | sort -V | tail -n 1", "r");
+            if (p) {
+                char buf[512];
+                if (fgets(buf, sizeof(buf), p)) {
+                    std::string s(buf);
+                    while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+                    if (!s.empty()) ndkDir = s;
+                }
+                pclose(p);
+            }
+        }
+#endif
+
+        if (!ndkDir.empty()) {
+#ifdef _WIN32
+            std::string ndkClang = ndkDir + "\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\aarch64-linux-android24-clang++.cmd";
+#else
+            std::string ndkClang = ndkDir + "/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++";
+#endif
+            std::ifstream testF(ndkClang);
+            if (testF.good()) {
+                androidCompiler = "\"" + ndkClang + "\"";
+            }
+        }
+
+        if (androidCompiler.empty() && hasCommand("aarch64-linux-gnu-g++")) {
+            androidCompiler = "aarch64-linux-gnu-g++ -static";
+        } else if (androidCompiler.empty() && hasCommand("zig")) {
+            androidCompiler = "zig c++ -target aarch64-linux-musl -static";
+        }
+
+        if (!androidCompiler.empty()) {
+            std::string cmd = androidCompiler + " -std=c++20 -O3 -flto " + sourceFile + " -lm -o " + outputFile;
+            res = std::system(cmd.c_str());
+            if (res != 0) {
+                std::string fallbackCmd = androidCompiler + " -std=c++20 -O3 " + sourceFile + " -lm -o " + outputFile;
+                res = std::system(fallbackCmd.c_str());
+            }
+#ifndef _WIN32
+            if (res == 0) {
+                (void)std::system(("chmod +x " + outputFile + " 2>/dev/null").c_str());
+            }
+#endif
+        } else {
+            std::cerr << "Error: Toolchain untuk target Android (ARM64) tidak ditemukan.\n";
+            std::cerr << "  💡 Solusi: Pasang Zig ('winget install zig.zig' di Windows / 'sudo apt install zig' di Linux) atau konfigurasi ANDROID_NDK_ROOT.\n";
+            std::remove(sourceFile.c_str());
+            return false;
+        }
+#endif
+    } else {
+        // Target: Linux
+#if !defined(_WIN32) && !defined(__ANDROID__)
+        std::string compiler = "g++";
+        const char* envCxx = std::getenv("CXX");
+        if (envCxx && *envCxx) {
+            compiler = envCxx;
+        } else if (hasCommand("clang++")) {
+            compiler = "clang++";
+        }
+        std::string cmd = compiler + " -std=c++20 -O3 -flto " + sourceFile + " -lm -lpthread -o " + outputFile;
+        res = std::system(cmd.c_str());
+        if (res != 0) {
+            std::string fallbackCmd = compiler + " -std=c++20 -O3 " + sourceFile + " -lm -lpthread -o " + outputFile;
+            res = std::system(fallbackCmd.c_str());
+        }
+        if (res == 0) {
+            (void)std::system(("chmod +x " + outputFile + " 2>/dev/null").c_str());
+        }
+#elif defined(__ANDROID__)
+        std::string compiler = "clang++";
+        std::string cmd = compiler + " -std=c++20 -O3 -flto " + sourceFile + " -lm -o " + outputFile;
+        res = std::system(cmd.c_str());
+        if (res == 0) {
+            (void)std::system(("chmod +x " + outputFile + " 2>/dev/null").c_str());
+        }
+#else
+        // Cross-compiling to Linux from Windows
+        std::string linuxCompiler;
+        if (hasCommand("zig")) {
+            linuxCompiler = "zig c++ -target x86_64-linux-musl -static";
+        } else if (hasCommand("x86_64-linux-gnu-g++")) {
+            linuxCompiler = "x86_64-linux-gnu-g++ -static";
+        } else if (hasCommand("wsl g++")) {
+            linuxCompiler = "wsl g++";
+        }
+
+        if (!linuxCompiler.empty()) {
+            std::string cmd = linuxCompiler + " -std=c++20 -O3 -flto " + sourceFile + " -lm -lpthread -o " + outputFile;
+            res = std::system(cmd.c_str());
+            if (res != 0) {
+                std::string fallbackCmd = linuxCompiler + " -std=c++20 -O3 " + sourceFile + " -lm -lpthread -o " + outputFile;
+                res = std::system(fallbackCmd.c_str());
+            }
+        } else {
+            std::cerr << "Error: Toolchain untuk target Linux tidak ditemukan di Windows.\n";
+            std::cerr << "  💡 Solusi: Pasang Zig ('winget install zig.zig') atau aktifkan WSL ('wsl').\n";
+            std::remove(sourceFile.c_str());
+            return false;
         }
 #endif
     }
-
-#ifdef _WIN32
-    std::string cmd = compiler + " -std=c++20 -O3 -march=native -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
-    int res = std::system(cmd.c_str());
-    if (res != 0) {
-        std::string fallbackCmd = compiler + " -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ " + sourceFile + " -lwininet -lgdi32 -luser32 -o " + outputFile;
-        res = std::system(fallbackCmd.c_str());
-    }
-#else
-    // On Linux and Android Termux:
-    std::string cmd = compiler + " -std=c++20 -O3 -march=native -flto " + sourceFile + " -lm -lpthread -o " + outputFile + " 2>/dev/null";
-    int res = std::system(cmd.c_str());
-    if (res != 0) {
-        std::string fallbackCmd = compiler + " -std=c++20 -O3 -flto " + sourceFile + " -lm -lpthread -o " + outputFile;
-        res = std::system(fallbackCmd.c_str());
-    }
-    if (res == 0) {
-        std::string chmodCmd = "chmod +x " + outputFile + " 2>/dev/null";
-        (void)std::system(chmodCmd.c_str());
-    }
-#endif
 
     std::remove(sourceFile.c_str());
     return res == 0;

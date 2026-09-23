@@ -237,8 +237,9 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         const Token& curTok = peek();
         const Token& nextTok = peekNext();
         if (nextTok.type != TokenType::ASSIGN && nextTok.type != TokenType::DOT && nextTok.type != TokenType::LBRACKET) {
-            if (functionArity_.find(curTok.lexeme) == functionArity_.end()) {
-                std::string match = Diagnostic::suggestSimilar(curTok.lexeme, Diagnostic::getStatementKeywords(), 2);
+            if (curTok.lexeme.size() >= 3 && functionArity_.find(curTok.lexeme) == functionArity_.end()) {
+                int maxDist = (curTok.lexeme.size() <= 4) ? 1 : 2;
+                std::string match = Diagnostic::suggestSimilar(curTok.lexeme, Diagnostic::getStatementKeywords(), maxDist);
                 if (!match.empty()) {
                     reportError("Keyword '" + curTok.lexeme + "' tidak dikenali", curTok, "Apakah maksud Anda '" + match + "'?");
                     advance();

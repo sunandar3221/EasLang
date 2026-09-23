@@ -9,7 +9,7 @@ class AotGenerator {
 public:
     AotGenerator();
     std::string generateCpp(BlockStmt* program);
-    bool buildBinary(const std::string& sourceFile, const std::string& outputFile);
+    bool buildBinary(const std::string& sourceFile, const std::string& outputFile, const std::string& target = "");
     static std::string getRuntimeSource();
 
 private:

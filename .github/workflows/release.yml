@@ -25,6 +25,12 @@ jobs:
           g++ -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas-windows-x64.exe
           cp eas-windows-x64.exe eas.exe
 
+      - name: Test eas build on Windows
+        shell: bash
+        run: |
+          ./eas.exe build main.eas -o test_main.exe
+          echo "Agus" | ./test_main.exe
+
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -64,6 +70,18 @@ jobs:
           chmod +x eas-android-arm64
           echo "Verifying shared library dependencies of eas-android-arm64:"
           readelf -d eas-android-arm64 | grep NEEDED || true
+
+      - name: Test eas build for Linux and Android
+        run: |
+          # Test Linux AOT build
+          ./eas-linux-x64 build main.eas --target linux -o test_main_linux
+          echo "Agus" | ./test_main_linux
+
+          # Test Android AOT build
+          NDK_DIR=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+          export ANDROID_NDK_ROOT="$NDK_DIR"
+          ./eas-linux-x64 build main.eas --target android -o test_main_android
+          readelf -h test_main_android | grep -E "Class|Machine"
 
       - name: Upload Linux and Android Artifacts
         uses: actions/upload-artifact@v4

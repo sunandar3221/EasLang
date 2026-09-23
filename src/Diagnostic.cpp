@@ -116,8 +116,11 @@ std::string Diagnostic::suggestSimilar(const std::string& word, const std::vecto
     int bestDist = 999;
     std::string bestCandidate = "";
 
+    if (word.size() <= 1) return "";
+
     int threshold = maxDist;
-    if (word.size() >= 6) threshold = std::max(threshold, 3);
+    if (word.size() <= 3) threshold = 1;
+    else if (word.size() >= 6) threshold = std::max(threshold, 3);
 
     for (const auto& cand : candidates) {
         if (cand == word) continue;
