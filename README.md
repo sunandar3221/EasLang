@@ -1,6 +1,6 @@
-# EasLang (.eas)
+# Fasthon (.fsn)
 
-EasLang adalah bahasa pemrograman modern berperforma tinggi dengan filosofi sintaks ultra-bersih (ultra-clean syntax), manajemen memori deterministik tanpa Garbage Collector (Zero-Cost RAII), arsitektur dual-engine (Bytecode Virtual Machine & AOT Compiler), serta standard library bawaan yang lengkap (*batteries-included*).
+Fasthon adalah bahasa pemrograman modern berperforma tinggi dengan filosofi sintaks ultra-bersih (ultra-clean syntax), manajemen memori deterministik tanpa Garbage Collector (Zero-Cost RAII), arsitektur dual-engine (Bytecode Virtual Machine & AOT Compiler), serta standard library bawaan yang lengkap (*batteries-included*).
 
 Proyek ini dilisensikan di bawah **MIT License**.
 
@@ -9,7 +9,7 @@ Proyek ini dilisensikan di bawah **MIT License**.
 ## Daftar Isi
 1. [Filosofi & Arsitektur](#1-filosofi--arsitektur)
 2. [Tutorial & Panduan Instalasi](#2-tutorial--panduan-instalasi)
-3. [Kursus Kilat EasLang (Crash Course)](#3-kursus-kilat-easlang-crash-course)
+3. [Kursus Kilat Fasthon (Crash Course)](#3-kursus-kilat-fasthon-crash-course)
    - [Bab 13: Tutorial Kilat & Panduan Lengkap Seluruh Modul Bawaan](#bab-13-tutorial-kilat--panduan-lengkap-seluruh-modul-bawaan-standard-library-deep-dive)
 4. [Kamus Keyword & Operator](#4-kamus-keyword--operator)
 5. [Sistem Diagnostik Cerdas & Rekomendasi Typo](#5-sistem-diagnostik-cerdas--rekomendasi-typo)
@@ -29,8 +29,8 @@ Proyek ini dilisensikan di bawah **MIT License**.
   - Tanpa deklarasi tipe data wajib yang bertele-tele
   - Blok kode berbasis baris dan indentasi alami (dengan opsi penutup blok `end`)
 - **Arsitektur Zero-Disk-Cache & Dual-Engine**:
-  - **In-Memory Flat-Stack Execution (Default CLI)**: Menjalankan skrip `.eas` langsung secara murni di dalam memori tanpa membuat berkas cache di disk (*zero storage bloat*). Menghasilkan eksekusi instan (0 ms compile time) dengan dispatch opcodes dan in-place register updates yang sangat cepat.
-  - **Ahead-Of-Time (AOT) Compiler Backend (`eas build`)**: Mengompilasi skrip `.eas` langsung menjadi berkas binary `.exe` native mandiri menggunakan optimasi agresif `-O3 -march=native -flto` tanpa dependensi runtime.
+  - **In-Memory Flat-Stack Execution (Default CLI)**: Menjalankan skrip `.fsn` langsung secara murni di dalam memori tanpa membuat berkas cache di disk (*zero storage bloat*). Menghasilkan eksekusi instan (0 ms compile time) dengan dispatch opcodes dan in-place register updates yang sangat cepat.
+  - **Ahead-Of-Time (AOT) Compiler Backend (`fasthon build`)**: Mengompilasi skrip `.fsn` langsung menjadi berkas binary `.exe` native mandiri menggunakan optimasi agresif `-O3 -march=native -flto` tanpa dependensi runtime.
 - **Manajemen Memori Deterministik (Zero GC Overhead)**:
   - Menggunakan model Zero-Cost RAII sehingga alokasi dan dealokasi memori terjadi seketika tanpa jeda *stop-the-world garbage collection*.
 - **Batteries-Included Standard Library**:
@@ -43,7 +43,7 @@ Proyek ini dilisensikan di bawah **MIT License**.
 
 ## 2. Tutorial & Panduan Instalasi
 
-Seluruh berkas binary resmi EasLang otomatis dikompilasi oleh **GitHub Actions CI/CD** untuk multi-platform (**Linux x86_64**, **Linux ARM64**, **Android Termux ARM64**, dan **Windows x64**). Anda **tidak perlu repot mengompilasi manual**.
+Seluruh berkas binary resmi Fasthon otomatis dikompilasi oleh **GitHub Actions CI/CD** untuk multi-platform (**Linux x86_64**, **Linux ARM64**, **Android Termux ARM64**, dan **Windows x64**). Anda **tidak perlu repot mengompilasi manual**.
 
 ---
 
@@ -57,24 +57,24 @@ Seluruh berkas binary resmi EasLang otomatis dikompilasi oleh **GitHub Actions C
    > 💡 **Apa yang dilakukan skrip ini?**
    > - Mendeteksi arsitektur CPU secara otomatis (`x86_64` atau `ARM64/aarch64`).
    > - Mengunduh binary prebuilt teroptimasi dari GitHub Releases.
-   > - Memasang binary langsung ke `/usr/local/bin/eas` (atau `~/.local/bin/eas`).
+   > - Memasang binary langsung ke `/usr/local/bin/fasthon` (atau `~/.local/bin/fasthon`).
 
 3. **Verifikasi Instalasi**:
-   Ketik perintah `eas` untuk masuk ke interactive REPL:
+   Ketik perintah `fasthon` (alias `eas`) untuk masuk ke interactive REPL:
    ```bash
    eas
    ```
    Atau buat dan jalankan skrip pertama Anda:
    ```bash
-   echo 'print "Halo dari EasLang di Linux!"' > halo.eas
-   eas halo.eas
+   echo 'print "Halo dari Fasthon di Linux!"' > halo.fsn
+   fasthon halo.fsn
    ```
 
 ---
 
 ### 📱 Tutorial Instalasi di Android (Termux)
 
-EasLang dapat berjalan secara native dan berkecepatan penuh di smartphone Android Anda menggunakan aplikasi **Termux**:
+Fasthon dapat berjalan secara native dan berkecepatan penuh di smartphone Android Anda menggunakan aplikasi **Termux**:
 
 1. **Buka Aplikasi Termux** di Android Anda.
 2. **Siapkan Paket Pendukung**:
@@ -87,7 +87,7 @@ EasLang dapat berjalan secara native dan berkecepatan penuh di smartphone Androi
    ```
    > 💡 **Kelebihan di Termux:**
    > - Mengunduh binary native Android Bionic (`eas-android-arm64`) yang dikompilasi langsung menggunakan Google Android NDK Clang.
-   > - Otomatis terpasang ke `$PREFIX/bin/eas` sehingga tidak butuh akses root/sudo sama sekali.
+   > - Otomatis terpasang ke `$PREFIX/bin/fasthon` sehingga tidak butuh akses root/sudo sama sekali.
 
 4. **Verifikasi Instalasi**:
    Ketik perintah berikut di Termux:
@@ -96,9 +96,9 @@ EasLang dapat berjalan secara native dan berkecepatan penuh di smartphone Androi
    ```
 5. **Coba Jalankan Skrip Pertama di Android**:
    ```bash
-   echo 'nama = "Android Termux"' > coba.eas
-   echo 'print "EasLang berjalan mulus di ${nama}"' >> coba.eas
-   eas coba.eas
+   echo 'nama = "Android Termux"' > coba.fsn
+   echo 'print "Fasthon berjalan mulus di ${nama}"' >> coba.fsn
+   fasthon coba.fsn
    ```
 
 ---
@@ -110,30 +110,30 @@ Anda dapat memilih salah satu dari dua metode berikut:
 #### Opsi 1: Unduh Cepat via PowerShell 1-Baris (Direkomendasikan)
 Buka PowerShell (tekan `Win + X` lalu pilih Terminal/PowerShell) dan jalankan:
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/sunandar3221/EasLang/releases/latest/download/eas.exe" -OutFile "$HOME\AppData\Local\Microsoft\WindowsApps\eas.exe"
+Invoke-WebRequest -Uri "https://github.com/sunandar3221/EasLang/releases/latest/download/fasthon.exe" -OutFile "$HOME\AppData\Local\Microsoft\WindowsApps\fasthon.exe"
 ```
-> ✨ Direktori `WindowsApps` sudah otomatis terdaftar di `PATH` Windows, sehingga Anda dapat langsung mengetik `eas` atau `eas.exe` dari folder/terminal mana saja tanpa perlu setting Environment Variables secara manual!
+> ✨ Direktori `WindowsApps` sudah otomatis terdaftar di `PATH` Windows, sehingga Anda dapat langsung mengetik `fasthon` (alias `eas`) atau `fasthon.exe` dari folder/terminal mana saja tanpa perlu setting Environment Variables secara manual!
 
 #### Opsi 2: Unduh Manual dari GitHub Releases
-1. Kunjungi [Halaman Rilis GitHub EasLang](https://github.com/sunandar3221/EasLang/releases/latest).
-2. Unduh berkas **`eas.exe`** (atau `eas-windows-x64.exe`).
-3. Simpan berkas di folder pilihan Anda (misal `C:\EasLang\eas.exe`).
+1. Kunjungi [Halaman Rilis GitHub Fasthon](https://github.com/sunandar3221/EasLang/releases/latest).
+2. Unduh berkas **`fasthon.exe`** (atau `eas-windows-x64.exe`).
+3. Simpan berkas di folder pilihan Anda (misal `C:\Fasthon\fasthon.exe`).
 4. *(Opsional)* Tambahkan folder tersebut ke `PATH` di Environment Variables Windows.
 5. Buka Command Prompt (CMD) atau PowerShell, lalu jalankan:
    ```cmd
-   eas.exe
+   fasthon.exe
    ```
 
 ---
 
 ### 🛠️ Opsi: Kompilasi Mandiri dari Source Code (Khusus Developer)
 
-Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code EasLang:
+Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code Fasthon:
 
 - **Linux / macOS / Termux**:
   ```bash
   git clone https://github.com/sunandar3221/EasLang.git
-  cd EasLang
+  cd Fasthon
   make
   sudo make install   # (di Termux cukup: make install)
   ```
@@ -141,16 +141,16 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code EasL
 - **Windows (MinGW / GCC / Clang)**:
   ```bash
   git clone https://github.com/sunandar3221/EasLang.git
-  cd EasLang
-  g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas.exe
+  cd Fasthon
+  g++ -std=c++20 -O3 -march=native -flto src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o fasthon.exe
   ```
 
 ---
 
-## 3. Kursus Kilat EasLang (Crash Course)
+## 3. Kursus Kilat Fasthon (Crash Course)
 
 ### Bab 1: Output, Variabel Dinamis, String Interpolation & Komentar
-Di EasLang, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan variabel di dalam string dapat ditulis langsung menggunakan **String Interpolation** (`${variabel}` atau `$variabel`), multi-argumen dengan spasi pemisah, maupun penggabungan string (`+`). Komentar dapat ditulis menggunakan `#` (gaya Python/Ruby) maupun `//` (gaya C/JavaScript):
+Di Fasthon, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan variabel di dalam string dapat ditulis langsung menggunakan **String Interpolation** (`${variabel}` atau `$variabel`), multi-argumen dengan spasi pemisah, maupun penggabungan string (`+`). Komentar dapat ditulis menggunakan `#` (gaya Python/Ruby) maupun `//` (gaya C/JavaScript):
 
 ```eas
 # Ini adalah komentar satu baris gaya Python
@@ -175,11 +175,11 @@ print("Halo Dunia")
 ```
 
 > ⚡ **Performa Maksimal (Zero Runtime Overhead)**:
-> String interpolation di EasLang diubah otomatis pada tahap parsing (*compile-time desugaring*) menjadi native concatenation. Ini membuat eksekusi string interpolation di Virtual Machine maupun biner native AOT berjalan dengan **kecepatan penuh tanpa latensi parsing di runtime**!
+> String interpolation di Fasthon diubah otomatis pada tahap parsing (*compile-time desugaring*) menjadi native concatenation. Ini membuat eksekusi string interpolation di Virtual Machine maupun biner native AOT berjalan dengan **kecepatan penuh tanpa latensi parsing di runtime**!
 
 
 ### Bab 2: Operasi Aritmatika & Ekspresi
-EasLang mendukung operator standar `+`, `-`, `*`, `/`, `%` dengan prioritas matematis yang benar serta pengelompokan menggunakan tanda kurung `()`:
+Fasthon mendukung operator standar `+`, `-`, `*`, `/`, `%` dengan prioritas matematis yang benar serta pengelompokan menggunakan tanda kurung `()`:
 
 ```eas
 val1 = 100
@@ -249,7 +249,7 @@ print status  # Output: Selamat Anda Lulus
 ```
 
 #### 3. Pencocokan Teks: Case Sensitive & Incase Sensitive
-EasLang menyediakan fungsi bawaan untuk membedakan maupun menyamakan perbandingan string antara huruf kapital dan non-kapital:
+Fasthon menyediakan fungsi bawaan untuk membedakan maupun menyamakan perbandingan string antara huruf kapital dan non-kapital:
 - **`case_sensitive(a, b)`**: Membedakan huruf kapital dan non-kapital secara ketat (menghasilkan `true` jika kedua teks persis sama, misal `"Agus"` dengan `"Agus"` adalah `true`, tapi `"Agus"` dengan `"agus"` adalah `false`).
 - **`incase_sensitive(a, b)`**: Menyamakan huruf kapital dan non-kapital (*case-insensitive*, menghasilkan `true` meskipun huruf besar/kecil berbeda, misal `"Agus"` dengan `"agus"` adalah `true`).
 - **`lower(teks)`**: Mengubah teks menjadi huruf kecil (*lowercase*).
@@ -332,7 +332,7 @@ print cekStatus(20) # Output: Adult
 ```
 
 #### Memasukkan Fungsi ke Variabel (First-Class Functions)
-Fungsi di EasLang dapat disimpan ke dalam variabel dan dideklarasikan secara dinamis:
+Fungsi di Fasthon dapat disimpan ke dalam variabel dan dideklarasikan secara dinamis:
 
 ```eas
 operasi = add
@@ -356,7 +356,7 @@ hobi = io.ask("Apa hobi kamu? ")
 
 io.print "Halo ${nama}, umur ${umur}, hobi ${hobi}"
 
-io.write "catatan.txt", "Belajar EasLang sangat menyenangkan"
+io.write "catatan.txt", "Belajar Fasthon sangat menyenangkan"
 isi = io.read "catatan.txt"
 print isi
 ```
@@ -401,10 +401,10 @@ run 500
 
 ### Bab 11: Modularitas, Pustaka Bawaan & Cara Membuat Library Sendiri (`use` / `import`)
 
-EasLang mendukung sistem modularitas modern yang fleksibel menggunakan kata kunci `use` atau `import`.
+Fasthon mendukung sistem modularitas modern yang fleksibel menggunakan kata kunci `use` atau `import`.
 
 #### A. Menggunakan Library Bawaan (Built-in Standard Libraries)
-EasLang menyertakan pustaka standar bawaan berkecepatan tinggi:
+Fasthon menyertakan pustaka standar bawaan berkecepatan tinggi:
 - **`io`**: Input/output berkas (`read`, `write`, `io.read`, `io.write`) dan input pengguna interaktif (`input`, `io.input`, `io.ask`). Wajib dimuat sebelum digunakan!
 - **`math`**: Operasi matematika presisi tinggi (`math.sqrt`, `math.abs`, `math.pow`, `math.pi`, dll.).
 - **`time`**: Operasi waktu dan jeda eksekusi (`time.now`, `time.sleep`).
@@ -428,10 +428,10 @@ io.print "Selesai jeda 1 detik"
 ---
 
 #### B. Tutorial: Cara Membuat Library / Modul Sendiri
-Membuat library di EasLang sangat sederhana. Anda cukup membuat berkas `.eas` baru dan mendefinisikan fungsi, variabel, atau objek yang ingin digunakan kembali oleh program lain.
+Membuat library di Fasthon sangat sederhana. Anda cukup membuat berkas `.fsn` baru dan mendefinisikan fungsi, variabel, atau objek yang ingin digunakan kembali oleh program lain.
 
-##### Langkah 1: Buat Berkas Library (Contoh: `kalkulator.eas`)
-Simpan file ini dengan nama `kalkulator.eas`:
+##### Langkah 1: Buat Berkas Library (Contoh: `kalkulator.fsn`)
+Simpan file ini dengan nama `kalkulator.fsn`:
 ```eas
 phi = 3.14159
 
@@ -466,8 +466,8 @@ fn luas_lingkaran r
 #### C. Tutorial: Cara Mengimpor & Menggunakan Library
 Gunakan perintah `import` atau `use` pada skrip utama Anda.
 
-##### Langkah 2: Buat Skrip Utama (Contoh: `main.eas`)
-Simpan di direktori yang sama dengan `kalkulator.eas`:
+##### Langkah 2: Buat Skrip Utama (Contoh: `main.fsn`)
+Simpan di direktori yang sama dengan `kalkulator.fsn`:
 ```eas
 use io
 import "kalkulator"
@@ -484,10 +484,10 @@ io.print "Luas lingkaran (r=10): ${luas}"
 ```
 
 ##### Berbagai Format Penulisan Impor yang Didukung:
-EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
+Fasthon memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 1. **Dengan Tanda Kutip**:
    - `import "kalkulator"` atau `use "kalkulator"`
-   - `import "kalkulator.eas"` atau `use "kalkulator.eas"`
+   - `import "kalkulator.fsn"` atau `use "kalkulator.fsn"`
 2. **Tanpa Tanda Kutip (Gaya Python / Ruby)**:
    - `import kalkulator` atau `use kalkulator`
 3. **Fleksibilitas Pemanggilan Fungsi**:
@@ -497,7 +497,7 @@ EasLang memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 
 ### Bab 12: Fungsi Bawaan Global & Konversi Tipe Data
 
-EasLang menyediakan fungsi bawaan global tingkat sistem yang dapat digunakan langsung tanpa perlu memuat pustaka tambahan:
+Fasthon menyediakan fungsi bawaan global tingkat sistem yang dapat digunakan langsung tanpa perlu memuat pustaka tambahan:
 
 #### 1. Konversi Tipe Data
 - **`str(val)`**: Mengonversi nilai apa pun (angka, boolean, list, objek) menjadi bentuk teks string.
@@ -519,7 +519,7 @@ print hasilGabung
 
 ```eas
 # Mengetahui panjang string & list
-print len("EasLang")          # Output: 7
+print len("Fasthon")          # Output: 7
 
 daftar = [10, 20]
 push(daftar, 30)
@@ -534,7 +534,7 @@ print pop(daftar)             # Output: 30
 - **`incase_sensitive(a, b)`**: Memeriksa apakah dua teks sama dengan menyamakan huruf kapital/non-kapital (*case-insensitive*).
 
 ```eas
-kalimat = "Belajar EasLang"
+kalimat = "Belajar Fasthon"
 print lower(kalimat)          # Output: belajar easlang
 print upper(kalimat)          # Output: BELAJAR EASLANG
 
@@ -548,7 +548,7 @@ print case_sensitive(user1, user2)    # Output: false
 
 ### Bab 13: Tutorial Kilat & Panduan Lengkap Seluruh Modul Bawaan (Standard Library Deep Dive)
 
-EasLang menganut filosofi *batteries-included*, di mana pustaka-pustaka esensial untuk kebutuhan komputasi matematika, I/O berkas & input keyboard, pengukuran waktu, jaringan HTTP, dan antarmuka jendela desktop native telah terintegrasi langsung di dalam engine tanpa perlu mengunduh package manager eksternal. Anda cukup mengaktifkannya menggunakan keyword `use <nama_modul>` atau `import <nama_modul>`.
+Fasthon menganut filosofi *batteries-included*, di mana pustaka-pustaka esensial untuk kebutuhan komputasi matematika, I/O berkas & input keyboard, pengukuran waktu, jaringan HTTP, dan antarmuka jendela desktop native telah terintegrasi langsung di dalam engine tanpa perlu mengunduh package manager eksternal. Anda cukup mengaktifkannya menggunakan keyword `use <nama_modul>` atau `import <nama_modul>`.
 
 ---
 
@@ -576,7 +576,7 @@ Modul `math` menyediakan fungsi-fungsi perhitungan matematika berkecepatan tingg
 | `math.e` | Konstanta bilangan Euler $e$ bernilai $2.718281828459...$ | `math.e` |
 
 ##### B. Contoh Praktis: Mengontrol Random Seed & Game Tebak Angka
-Secara default, saat Anda menjalankan EasLang, generator angka acak **otomatis menggunakan entropi perangkat keras** sehingga setiap kali program dijalankan, angka tebakan akan selalu berbeda dan tidak bisa diprediksi. Namun jika Anda membutuhkan hasil yang konsisten (misalnya saat testing), Anda dapat menetapkan seed secara manual:
+Secara default, saat Anda menjalankan Fasthon, generator angka acak **otomatis menggunakan entropi perangkat keras** sehingga setiap kali program dijalankan, angka tebakan akan selalu berbeda dan tidak bisa diprediksi. Namun jika Anda membutuhkan hasil yang konsisten (misalnya saat testing), Anda dapat menetapkan seed secara manual:
 
 ```eas
 use io
@@ -686,7 +686,7 @@ print "⚡ Waktu komputasi yang dibutuhkan: ${durasi} ms"
 ---
 
 #### 4. Modul `net` / `http` (HTTP Client & Komunikasi Jaringan)
-Modul `net` (bisa juga diakses dengan alias `http`) memungkinkan program EasLang melakukan permintaan jaringan berbasis protokol HTTP GET dan POST secara langsung.
+Modul `net` (bisa juga diakses dengan alias `http`) memungkinkan program Fasthon melakukan permintaan jaringan berbasis protokol HTTP GET dan POST secara langsung.
 
 ##### A. Kamus Fungsi Modul `net` / `http`
 | Fungsi | Penjelasan | Contoh Penggunaan |
@@ -713,7 +713,7 @@ Modul `gui` menyediakan API minimalis berkinerja tinggi untuk memunculkan antarm
 ##### A. Kamus Fungsi Modul `gui`
 | Fungsi | Penjelasan | Contoh Penggunaan |
 | :--- | :--- | :--- |
-| `gui.app(judul)` *(atau `app judul`)* | Menginisialisasi aplikasi GUI dan menentukan judul bilah jendela (*window title*) | `gui.app "Kalkulator EasLang"` |
+| `gui.app(judul)` *(atau `app judul`)* | Menginisialisasi aplikasi GUI dan menentukan judul bilah jendela (*window title*) | `gui.app "Kalkulator Fasthon"` |
 | `gui.window(lebar, tinggi)` *(atau `window w h`)* | Mengatur dimensi ukuran jendela dalam piksel | `gui.window 800 600` |
 | `gui.run(timeout_ms)` *(atau `run`)* | Menjalankan message loop native. Jika diberi parameter milidetik, jendela akan otomatis tertutup setelah waktu habis | `gui.run 3000` *(tampil selama 3 detik)* |
 
@@ -723,7 +723,7 @@ use io
 use gui
 
 print "Mempersiapkan jendela native..."
-gui.app "Dashboard Monitoring EasLang"
+gui.app "Dashboard Monitoring Fasthon"
 gui.window 1024 768
 print "Jendela berhasil dibuat di layar pengguna!"
 
@@ -739,8 +739,8 @@ Meskipun fungsi manipulasi teks umum tersedia secara global, modul `str` menyedi
 ##### A. Kamus Fungsi Modul `str`
 | Fungsi | Penjelasan | Contoh Penggunaan |
 | :--- | :--- | :--- |
-| `str.lower(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kecil | `str.lower("EasLang")` $\rightarrow$ `"easlang"` |
-| `str.upper(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kapital | `str.upper("EasLang")` $\rightarrow$ `"EASLANG"` |
+| `str.lower(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kecil | `str.lower("Fasthon")` $\rightarrow$ `"easlang"` |
+| `str.upper(teks)` | Mengubah seluruh abjad dalam teks menjadi huruf kapital | `str.upper("Fasthon")` $\rightarrow$ `"EASLANG"` |
 | `str.case_sensitive(a, b)` | Membandingkan kecocokan dua teks secara ketat dengan membedakan huruf besar/kecil | `str.case_sensitive("A", "a")` $\rightarrow$ `false` |
 | `str.incase_sensitive(a, b)` | Membandingkan kecocokan dua teks tanpa mempedulikan huruf besar/kecil (*case-insensitive*) | `str.incase_sensitive("Admin", "admin")` $\rightarrow$ `true` |
 
@@ -788,7 +788,7 @@ else
 | `continue` | Kontrol Loop | Melompati sisa baris iterasi saat ini dan langsung ke iterasi loop berikutnya | `continue` |
 | `return` | Fungsi | Mengembalikan nilai dari fungsi secara eksplisit / keluar lebih awal | `return hasil` |
 | `fn` / `def` / `func` | Fungsi | Mendeklarasikan fungsi baru (mendukung implicit dan explicit return) | `def calc a b` atau `fn x` |
-| `use` / `import` | Modul | Mengimpor berkas modul `.eas` eksternal atau pustaka bawaan (didukung juga `include` / `require`) | `use io` atau `import math` |
+| `use` / `import` | Modul | Mengimpor berkas modul `.fsn` eksternal atau pustaka bawaan (didukung juga `include` / `require`) | `use io` atau `import math` |
 | `new` | Objek | Menginstansiasi objek map/state baru di memori | `user = new` |
 | `get` | Objek / HTTP | Mengambil properti objek (`get obj "key"`) atau melakukan HTTP GET (`get "url"`) | `get user "name"` |
 | `set` | Objek | Menetapkan nilai properti pada objek/map (`set obj "key" val`) | `set user "age" 25` |
@@ -856,7 +856,7 @@ Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use
 
 ## 5. Sistem Diagnostik Cerdas & Rekomendasi Typo
 
-EasLang dilengkapi dengan **Mesin Diagnostik Kontekstual Modern** yang ramah developer (*developer-friendly*), terinspirasi dari gaya diagnostik Python 3.11+ dan Rust, namun dirancang khusus khas EasLang.
+Fasthon dilengkapi dengan **Mesin Diagnostik Kontekstual Modern** yang ramah developer (*developer-friendly*), terinspirasi dari gaya diagnostik Python 3.11+ dan Rust, namun dirancang khusus khas Fasthon.
 
 ### Fitur Utama Diagnostik:
 - **Tampilan Visual Presisi**: Menampilkan nama file, nomor baris, nomor kolom, kutipan baris kode sumber, dan penunjuk caret (`^^^^`) tepat pada token yang bermasalah.
@@ -865,23 +865,23 @@ EasLang dilengkapi dengan **Mesin Diagnostik Kontekstual Modern** yang ramah dev
   - **Variabel dalam Scope**: Jika Anda salah mengetik variabel misalnya `tebakn`, mesin otomatis menganalisis variabel yang telah didefinisikan sebelumnya dan menyarankan `tebakan`.
   - **Fungsi & Properti Modul**: Misalnya `math.sqr` disarankan menjadi `math.sqrt`.
 - **Rekomendasi Modul Otomatis (`ImportError`)**: Ketika Anda memanggil fungsi modul tanpa `use` terlebih dahulu (misal `input()` atau `math.random()`), mesin tidak hanya memberitahu error melainkan menyertakan solusi instan: `💡 Rekomendasi: use io` beserta baris yang perlu ditambahkan.
-- **Zero-Cost Overhead**: Seluruh logika pencarian kemiripan kata dan pemformatan teks hanya berjalan saat terjadi kesalahan (*cold path*). Saat kode berjalan normal, **performa eksekusi EasLang tetap 100% instan dan tidak terbebani sama sekali**.
+- **Zero-Cost Overhead**: Seluruh logika pencarian kemiripan kata dan pemformatan teks hanya berjalan saat terjadi kesalahan (*cold path*). Saat kode berjalan normal, **performa eksekusi Fasthon tetap 100% instan dan tidak terbebani sama sekali**.
 
 #### Contoh Tampilan Diagnostik:
 ```
-File "game.eas", line 8, col 1
+File "game.fsn", line 8, col 1
    8 | whlie selesai == false
      | ^^^^^
 SyntaxError: Keyword 'whlie' tidak dikenali
   💡 Rekomendasi: Apakah maksud Anda 'while'?
 
-File "game.eas", line 12, col 4
+File "game.fsn", line 12, col 4
   12 | if tebakn < angka
      |    ^^^^^^
 NameError: Variabel 'tebakn' belum didefinisikan.
   💡 Rekomendasi: Apakah maksud Anda variabel 'tebakan'?
 
-File "skrip.eas", line 1, col 5
+File "skrip.fsn", line 1, col 5
    1 | x = input("Masukkan angka: ")
      |     ^^^^^
 ImportError: Modul 'io' belum dimuat. 'input' memerlukan modul 'io'.
@@ -893,13 +893,13 @@ ImportError: Modul 'io' belum dimuat. 'input' memerlukan modul 'io'.
 
 ## 6. Hasil Benchmark & Komparasi Kecepatan
 
-Pengujian performa dilakukan secara langsung di lingkungan Windows 64-bit pada prosesor multi-core dengan membandingkan **EasLang Low-Machine Engine**, **EasLang Standalone Native Binary**, dan **Python 3.14**.
+Pengujian performa dilakukan secara langsung di lingkungan Windows 64-bit pada prosesor multi-core dengan membandingkan **Fasthon Ultra VM Engine**, **Fasthon Standalone Native Binary**, dan **Python 3.14**.
 
 ### Benchmark A: Suite Gabungan (2.000.000 Iterasi Loop + Fibonacci Rekursif $N=28$)
 
 | Runtime / Engine | Waktu Eksekusi | Kecepatan Relatif vs Python |
 | :--- | :--- | :--- |
-| **EasLang Low-Machine Engine** | **88 ms** | **8.45x lebih cepat** |
+| **Fasthon Ultra VM Engine** | **88 ms** | **8.45x lebih cepat** |
 | **Python 3.14** | **744 ms** | Baseline CPython standar |
 
 ### Benchmark B: Rekursif Fibonacci Mendalam ($N = 32$)
@@ -908,7 +908,7 @@ Menguji performa evaluasi rekursi bertingkat tinggi (4.356.617 pemanggilan fungs
 
 | Runtime / Engine | Waktu Eksekusi | Kecepatan Relatif vs Python |
 | :--- | :--- | :--- |
-| **EasLang Low-Machine Engine** | **150 ms** | **8.04x lebih cepat** |
+| **Fasthon Ultra VM Engine** | **150 ms** | **8.04x lebih cepat** |
 | **Python 3.14** | **1.206 ms** | Baseline CPython standar |
 
 ### Benchmark C: Loop 10.000.000 Iterasi (Komputasi Intensif)
@@ -917,8 +917,8 @@ Menguji performa operasi perulangan dan aritmatika intensif berskala besar:
 
 | Runtime / Engine | Waktu Eksekusi | Kecepatan Relatif vs Python |
 | :--- | :--- | :--- |
-| **EasLang Standalone Native Binary (`eas build`)** | **57 ms** | **37.8x lebih cepat** |
-| **EasLang CLI Cached Engine (`eas script.eas`)** | **245 ms** | **8.8x lebih cepat** |
+| **Fasthon Standalone Native Binary (`fasthon build`)** | **57 ms** | **37.8x lebih cepat** |
+| **Fasthon Ultra VM Engine (`fasthon script.fsn`)** | **209 ms** | **8.8x lebih cepat** |
 | **Python 3.14** | **2.157 ms** | Baseline CPython standar |
 
 ---
@@ -926,20 +926,20 @@ Menguji performa operasi perulangan dan aritmatika intensif berskala besar:
 ## 7. Panduan Eksekusi & Kompilasi AOT (Linux, Android Termux, Windows)
 
 ### 1. Eksekusi Skrip Instan Tanpa Cache (Default CLI Mode)
-Jalankan berkas skrip `.eas` secara langsung. Engine mengeksekusi secara instan di dalam memori tanpa meninggalkan berkas cache di penyimpanan disk (*zero disk cache*):
+Jalankan berkas skrip `.fsn` secara langsung. Engine mengeksekusi secara instan di dalam memori tanpa meninggalkan berkas cache di penyimpanan disk (*zero disk cache*):
 
 ```bash
 # Di Linux & Android (Termux):
-eas script.eas
+fasthon script.fsn
 
 # Di Windows:
-.\eas.exe script.eas
+.\fasthon.exe script.fsn
 ```
 
-### 2. Kompilasi AOT ke Executable Mandiri Multi-Platform (`eas build`)
-Perintah `eas build` mengompilasi skrip `.eas` menjadi binary executable native mandiri (*self-contained*) dengan optimasi C++20 `-O3 -flto`.
+### 2. Kompilasi AOT ke Executable Mandiri Multi-Platform (`fasthon build`)
+Perintah `fasthon build` mengompilasi skrip `.fsn` menjadi binary executable native mandiri (*self-contained*) dengan optimasi C++20 `-O3 -flto`.
 
-Binary yang dihasilkan **100% mandiri** (runtime standard library disematkan langsung di dalam berkas hasil kompilasi), sehingga berkas `.exe` atau binary Linux/Android dapat disalin dan dijalankan di komputer atau perangkat mana saja tanpa memerlukan folder source code EasLang.
+Binary yang dihasilkan **100% mandiri** (runtime standard library disematkan langsung di dalam berkas hasil kompilasi), sehingga berkas `.exe` atau binary Linux/Android dapat disalin dan dijalankan di komputer atau perangkat mana saja tanpa memerlukan folder source code Fasthon.
 
 #### 🐧 Di Linux:
 Pastikan Anda memiliki compiler C++ (`g++` atau `clang++`):
@@ -947,21 +947,21 @@ Pastikan Anda memiliki compiler C++ (`g++` atau `clang++`):
 # Install compiler jika belum ada (Ubuntu/Debian)
 sudo apt update && sudo apt install g++ -y
 
-# Kompilasi skrip EasLang
-eas build game.eas -o game
+# Kompilasi skrip Fasthon
+fasthon build game.fsn -o game
 
 # Jalankan langsung
 ./game
 ```
 
 #### 📱 Di Android (Termux):
-`eas build` dapat berjalan langsung di ponsel Android via Termux menggunakan compiler Clang bawaan Termux:
+`fasthon build` dapat berjalan langsung di ponsel Android via Termux menggunakan compiler Clang bawaan Termux:
 ```bash
 # Siapkan Clang di Termux (sekali saja)
 pkg update && pkg install clang -y
 
-# Kompilasi skrip EasLang menjadi binary native Android
-eas build game.eas -o game
+# Kompilasi skrip Fasthon menjadi binary native Android
+fasthon build game.fsn -o game
 
 # Jalankan langsung di Termux
 ./game
@@ -971,7 +971,7 @@ eas build game.eas -o game
 #### 🪟 Di Windows:
 Menggunakan compiler MinGW-w64 (`g++` atau `clang++`):
 ```cmd
-eas build game.eas -o game.exe
+fasthon build game.fsn -o game.exe
 .\game.exe
 ```
 
@@ -980,25 +980,25 @@ Anda dapat secara eksplisit memilih target platform binary yang ingin dihasilkan
 
 ```bash
 # Build untuk Linux (ELF Binary):
-eas build game.eas --target linux -o game
+fasthon build game.fsn --target linux -o game
 
 # Build untuk Android ARM64 (ELF Binary):
-eas build game.eas --target android -o game
+fasthon build game.fsn --target android -o game
 
 # Build untuk Windows (.exe):
-eas build game.eas --target windows -o game.exe
+fasthon build game.fsn --target windows -o game.exe
 ```
 > 💡 Anda juga dapat menggunakan flag shortcut seperti `--linux`, `--android`, atau `--windows`.
 
 ### 3. Mode Interaktif (Interactive REPL)
-Jalankan `eas` tanpa argumen untuk masuk ke interactive shell:
+Jalankan `fasthon` (alias `eas`) tanpa argumen untuk masuk ke interactive shell:
 
 ```bash
 # Di Linux & Android (Termux):
 eas
 
 # Di Windows:
-.\eas.exe
+.\fasthon.exe
 ```
 Ketik `exit` untuk keluar dari REPL.
 

@@ -19,17 +19,17 @@ int main(int argc, char* argv[]) {
 
     std::string arg1 = argv[1];
     if (arg1 == "-v" || arg1 == "--version" || arg1 == "version") {
-        std::cout << "EasLang v1.0.0\n";
+        std::cout << "Fasthon v1.0.0 (Ultra High-Performance Engine)\n";
         return 0;
     }
     if (arg1 == "-h" || arg1 == "--help" || arg1 == "help") {
-        std::cout << "Usage: eas [script.eas] | build <script.eas> [-o output] [--target <windows|linux|android>] | --version\n";
+        std::cout << "Usage: fasthon [script.fsn] | build <script.fsn> [-o output] [--target <windows|linux|android>] | --version\n";
         return 0;
     }
 
     if (arg1 == "build" || arg1 == "-c" || arg1 == "--compile") {
         if (argc < 3) {
-            std::cerr << "Usage: eas build <input.eas> [-o <output>] [--target <windows|linux|android>]\n";
+            std::cerr << "Usage: fasthon build <input.fsn> [-o <output>] [--target <windows|linux|android>]\n";
             return 1;
         }
 
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (inputFile.empty()) {
-            std::cerr << "Usage: eas build <input.eas> [-o <output>] [--target <windows|linux|android>]\n";
+            std::cerr << "Usage: fasthon build <input.fsn> [-o <output>] [--target <windows|linux|android>]\n";
             return 1;
         }
 
@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
             std::string base = inputFile;
             size_t slash = base.find_last_of("/\\");
             if (slash != std::string::npos) base = base.substr(slash + 1);
-            if (base.size() > 4 && base.substr(base.size() - 4) == ".eas") {
+            if (base.size() > 4 && (base.substr(base.size() - 4) == ".fsn" || base.substr(base.size() - 4) == ".eas")) {
                 base = base.substr(0, base.size() - 4);
             }
             if (normTarget == "windows" || normTarget == "win" || normTarget == "win64") {
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
         AotGenerator aot;
         std::string cppCode = aot.generateCpp(program.get());
 
-        std::string tempCpp = "_eas_build_temp.cpp";
+        std::string tempCpp = "_fasthon_build_temp.cpp";
         std::ofstream outCpp(tempCpp);
         if (!outCpp.is_open()) {
             std::cerr << "Error: Could not create temporary AOT source file.\n";
@@ -139,11 +139,26 @@ int main(int argc, char* argv[]) {
         scriptPath = (argc > 2 ? argv[2] : "");
     }
     if (scriptPath.empty()) {
-        std::cerr << "Usage: eas <script.eas>\n";
+        std::cerr << "Usage: fasthon <script.fsn>\n";
         return 1;
     }
 
     Value content = StandardLibrary::readFile(scriptPath);
+    if (content.strVal.empty()) {
+        if (scriptPath.find('.') == std::string::npos) {
+            std::string tryFsn = scriptPath + ".fsn";
+            content = StandardLibrary::readFile(tryFsn);
+            if (!content.strVal.empty()) {
+                scriptPath = tryFsn;
+            } else {
+                std::string tryEas = scriptPath + ".eas";
+                content = StandardLibrary::readFile(tryEas);
+                if (!content.strVal.empty()) {
+                    scriptPath = tryEas;
+                }
+            }
+        }
+    }
     if (content.strVal.empty()) {
         std::ifstream testOpen(scriptPath);
         if (!testOpen.good()) {

@@ -15,11 +15,11 @@
 #define FILENO fileno
 #endif
 
-std::string Diagnostic::currentFilename_ = "script.eas";
+std::string Diagnostic::currentFilename_ = "script.fsn";
 std::vector<std::string> Diagnostic::sourceLines_;
 
 void Diagnostic::setSource(const std::string& filename, const std::string& source) {
-    currentFilename_ = filename.empty() ? "script.eas" : filename;
+    currentFilename_ = filename.empty() ? "script.fsn" : filename;
     sourceLines_.clear();
 
     std::string cur;

@@ -46,7 +46,16 @@ enum class OpCode : uint8_t {
     OP_BUILD_LIST,
     OP_GET_INDEX,
     OP_SET_INDEX,
-    OP_USE
+    OP_USE,
+    OP_INC_LOCAL,
+    OP_DEC_LOCAL,
+    OP_ADD_LOCAL_INT,
+    OP_SUB_LOCAL_INT,
+    OP_JUMP_IF_LOCAL_GE_CONST,
+    OP_JUMP_IF_LOCAL_GT_CONST,
+    OP_JUMP_IF_LOCAL_LE_CONST,
+    OP_JUMP_IF_LOCAL_LT_CONST,
+    OP_FAST_LOOP
 };
 
 class Chunk {

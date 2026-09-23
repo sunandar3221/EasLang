@@ -1,4 +1,4 @@
-name: Build and Release EasLang
+name: Build and Release Fasthon
 
 on:
   push:
@@ -22,13 +22,15 @@ jobs:
       - name: Compile Windows Binary
         shell: bash
         run: |
-          g++ -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o eas-windows-x64.exe
-          cp eas-windows-x64.exe eas.exe
+          g++ -std=c++20 -O3 -flto -static -static-libgcc -static-libstdc++ src/*.cpp -Iinclude -lwininet -lgdi32 -luser32 -o fasthon-windows-x64.exe
+          cp fasthon-windows-x64.exe fasthon.exe
+          cp fasthon-windows-x64.exe eas-windows-x64.exe
+          cp fasthon-windows-x64.exe eas.exe
 
-      - name: Test eas build on Windows
+      - name: Test fasthon build on Windows
         shell: bash
         run: |
-          ./eas.exe build main.eas -o test_main.exe
+          ./fasthon.exe build main.fsn -o test_main.exe
           echo "Agus" | ./test_main.exe
 
       - name: Upload Windows Artifacts
@@ -36,6 +38,8 @@ jobs:
         with:
           name: windows-binaries
           path: |
+            fasthon-windows-x64.exe
+            fasthon.exe
             eas-windows-x64.exe
             eas.exe
 
@@ -53,34 +57,38 @@ jobs:
 
       - name: Compile Linux x86_64 Binaries
         run: |
-          g++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -o eas-linux-x64
-          g++ -std=c++20 -O3 -flto -static src/*.cpp -Iinclude -o eas-linux-x64-static
-          chmod +x eas-linux-x64 eas-linux-x64-static
+          g++ -std=c++20 -O3 -flto src/*.cpp -Iinclude -o fasthon-linux-x64
+          g++ -std=c++20 -O3 -flto -static src/*.cpp -Iinclude -o fasthon-linux-x64-static
+          chmod +x fasthon-linux-x64 fasthon-linux-x64-static
+          cp fasthon-linux-x64 eas-linux-x64
+          cp fasthon-linux-x64-static eas-linux-x64-static
 
       - name: Compile Linux ARM64 Static Binary
         run: |
-          aarch64-linux-gnu-g++ -std=c++20 -O3 -flto -static src/*.cpp -Iinclude -o eas-linux-arm64-static
-          chmod +x eas-linux-arm64-static
+          aarch64-linux-gnu-g++ -std=c++20 -O3 -flto -static src/*.cpp -Iinclude -o fasthon-linux-arm64-static
+          chmod +x fasthon-linux-arm64-static
+          cp fasthon-linux-arm64-static eas-linux-arm64-static
 
       - name: Compile Android Termux ARM64 Native Binary
         run: |
           NDK_DIR=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
           echo "Found Android NDK at: $NDK_DIR"
-          $NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++ -std=c++20 -O3 -flto -static-libstdc++ src/*.cpp -Iinclude -o eas-android-arm64
-          chmod +x eas-android-arm64
-          echo "Verifying shared library dependencies of eas-android-arm64:"
-          readelf -d eas-android-arm64 | grep NEEDED || true
+          $NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++ -std=c++20 -O3 -flto -static-libstdc++ src/*.cpp -Iinclude -o fasthon-android-arm64
+          chmod +x fasthon-android-arm64
+          cp fasthon-android-arm64 eas-android-arm64
+          echo "Verifying shared library dependencies of fasthon-android-arm64:"
+          readelf -d fasthon-android-arm64 | grep NEEDED || true
 
-      - name: Test eas build for Linux and Android
+      - name: Test fasthon build for Linux and Android
         run: |
           # Test Linux AOT build
-          ./eas-linux-x64 build main.eas --target linux -o test_main_linux
+          ./fasthon-linux-x64 build main.fsn --target linux -o test_main_linux
           echo "Agus" | ./test_main_linux
 
           # Test Android AOT build
           NDK_DIR=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
           export ANDROID_NDK_ROOT="$NDK_DIR"
-          ./eas-linux-x64 build main.eas --target android -o test_main_android
+          ./fasthon-linux-x64 build main.fsn --target android -o test_main_android
           readelf -h test_main_android | grep -E "Class|Machine"
 
       - name: Upload Linux and Android Artifacts
@@ -88,6 +96,10 @@ jobs:
         with:
           name: linux-android-binaries
           path: |
+            fasthon-linux-x64
+            fasthon-linux-x64-static
+            fasthon-linux-arm64-static
+            fasthon-android-arm64
             eas-linux-x64
             eas-linux-x64-static
             eas-linux-arm64-static
@@ -126,4 +138,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ steps.tag_info.outputs.tag }} dist/* --clobber || gh release create ${{ steps.tag_info.outputs.tag }} dist/* --title "EasLang ${{ steps.tag_info.outputs.tag }}" --notes "Multi-platform prebuilt binaries for Windows, Linux, and Android (Termux)."
+          gh release upload ${{ steps.tag_info.outputs.tag }} dist/* --clobber || gh release create ${{ steps.tag_info.outputs.tag }} dist/* --title "Fasthon ${{ steps.tag_info.outputs.tag }}" --notes "Multi-platform prebuilt binaries for Windows, Linux, and Android (Termux) powered by Fasthon Ultra High-Performance Engine."

@@ -2,6 +2,7 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Diagnostic.hpp"
+#include <fstream>
 
 struct ReturnException {
     Value value;
@@ -268,8 +269,13 @@ Value Interpreter::execute(Stmt* stmt) {
             return Value(true);
         }
         std::string filename = mod;
-        if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
-            filename += ".eas";
+        if (filename.size() < 4 || (filename.substr(filename.size() - 4) != ".fsn" && filename.substr(filename.size() - 4) != ".eas")) {
+            std::ifstream testFsn(filename + ".fsn");
+            if (testFsn.good()) {
+                filename += ".fsn";
+            } else {
+                filename += ".eas";
+            }
         }
         Value fileContent = StandardLibrary::readFile(filename);
         if (fileContent.strVal.empty()) {

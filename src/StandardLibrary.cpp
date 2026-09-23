@@ -19,12 +19,12 @@
 #include <unistd.h>
 #endif
 
-std::string StandardLibrary::appTitle_ = "EasLang App";
+std::string StandardLibrary::appTitle_ = "Fasthon App";
 int StandardLibrary::windowWidth_ = 800;
 int StandardLibrary::windowHeight_ = 600;
 
 #ifdef _WIN32
-static LRESULT CALLBACK EasWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK FasthonWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_DESTROY:
             PostQuitMessage(0);
@@ -101,7 +101,7 @@ Value StandardLibrary::writeFile(const std::string& path, const std::string& con
 
 Value StandardLibrary::httpGet(const std::string& url) {
 #ifdef _WIN32
-    HINTERNET hInternet = InternetOpenA("EasLangClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    HINTERNET hInternet = InternetOpenA("FasthonClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
         return Value("HTTP_ERROR: failed to open internet");
     }
@@ -143,7 +143,7 @@ Value StandardLibrary::httpGet(const std::string& url) {
 
 Value StandardLibrary::httpSend(const std::string& url, const std::string& data) {
 #ifdef _WIN32
-    HINTERNET hInternet = InternetOpenA("EasLangClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    HINTERNET hInternet = InternetOpenA("FasthonClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
         return Value("HTTP_ERROR: failed to open internet");
     }
@@ -192,10 +192,11 @@ int StandardLibrary::getWindowHeight() {
 Value StandardLibrary::runApp(int timeoutMs) {
 #ifdef _WIN32
     if (timeoutMs < 0) {
-        const char* envTimeout = std::getenv("EAS_TIMEOUT");
+        const char* envTimeout = std::getenv("FASTHON_TIMEOUT");
+        if (!envTimeout) envTimeout = std::getenv("EAS_TIMEOUT");
         if (envTimeout) {
             timeoutMs = std::atoi(envTimeout);
-        } else if (std::getenv("EAS_HEADLESS")) {
+        } else if (std::getenv("FASTHON_HEADLESS") || std::getenv("EAS_HEADLESS")) {
             timeoutMs = 150;
         }
     }
@@ -203,17 +204,17 @@ Value StandardLibrary::runApp(int timeoutMs) {
     HINSTANCE hInst = GetModuleHandleA(NULL);
     WNDCLASSEXA wc{};
     wc.cbSize = sizeof(WNDCLASSEXA);
-    wc.lpfnWndProc = EasWindowProc;
+    wc.lpfnWndProc = FasthonWindowProc;
     wc.hInstance = hInst;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszClassName = "EasLangAppClass";
+    wc.lpszClassName = "FasthonAppClass";
 
     RegisterClassExA(&wc);
 
     HWND hwnd = CreateWindowExA(
         0,
-        "EasLangAppClass",
+        "FasthonAppClass",
         appTitle_.c_str(),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,

@@ -54,8 +54,13 @@ void AotGenerator::resolveImports(BlockStmt* program,
                 continue;
             }
             std::string filename = mod;
-            if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
-                filename += ".eas";
+            if (filename.size() < 4 || (filename.substr(filename.size() - 4) != ".fsn" && filename.substr(filename.size() - 4) != ".eas")) {
+                std::ifstream testFsn(filename + ".fsn");
+                if (testFsn.good()) {
+                    filename += ".fsn";
+                } else {
+                    filename += ".eas";
+                }
             }
             if (visited.find(filename) != visited.end()) {
                 continue;
@@ -1315,7 +1320,7 @@ public:
 
     static Value httpGet(const std::string& url) {
 #ifdef _WIN32
-        HINTERNET hInternet = InternetOpenA("EasLangClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+        HINTERNET hInternet = InternetOpenA("FasthonClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
         if (!hInternet) return Value("HTTP_ERROR: failed to open internet");
         HINTERNET hUrl = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
         if (!hUrl) { InternetCloseHandle(hInternet); return Value("HTTP_RESPONSE: 200 OK (dummy network fallback for " + url + ")"); }
@@ -1341,7 +1346,7 @@ public:
 
     static Value httpSend(const std::string& url, const std::string& data) {
 #ifdef _WIN32
-        HINTERNET hInternet = InternetOpenA("EasLangClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+        HINTERNET hInternet = InternetOpenA("FasthonClient/1.0", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
         if (!hInternet) return Value("HTTP_ERROR: failed to open internet");
         HINTERNET hUrl = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
         if (!hUrl) { InternetCloseHandle(hInternet); return Value("SENT: " + data + " to " + url); }

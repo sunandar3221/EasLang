@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <memory>
 
+#include <unordered_set>
+
 struct Local {
     std::string name;
     int depth;
@@ -25,6 +27,7 @@ private:
     std::vector<Local> locals_;
     int scopeDepth_;
     int maxLocals_;
+    std::unordered_set<std::string> sharedGlobals_;
     std::unordered_map<std::string, std::shared_ptr<Chunk>> functions_;
     struct LoopContext {
         std::vector<size_t> breakJumps;
@@ -32,6 +35,7 @@ private:
     };
     std::vector<LoopContext> loopStack_;
 
+    void collectFnFreeVars(BlockStmt* block);
     void compileStmt(Stmt* stmt);
     void compileBlock(BlockStmt* block);
     void compileExpr(Expr* expr);

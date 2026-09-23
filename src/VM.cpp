@@ -3,6 +3,7 @@
 #include "Parser.hpp"
 #include "BytecodeCompiler.hpp"
 #include "Diagnostic.hpp"
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <cmath>
@@ -89,8 +90,13 @@ void VM::loadLibrary(const std::string& name) {
         globals_["string"] = strObj;
     } else {
         std::string filename = name;
-        if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
-            filename += ".eas";
+        if (filename.size() < 4 || (filename.substr(filename.size() - 4) != ".fsn" && filename.substr(filename.size() - 4) != ".eas")) {
+            std::ifstream testFsn(filename + ".fsn");
+            if (testFsn.good()) {
+                filename += ".fsn";
+            } else {
+                filename += ".eas";
+            }
         }
         Value fileContent = StandardLibrary::readFile(filename);
         if (!fileContent.strVal.empty()) {
@@ -743,6 +749,7 @@ Value VM::run(Chunk* chunk) {
                     if (it != functions_.end()) {
                         frame->ip = ip;
                         Chunk* nChunk = it->second.get();
+                        curChunk->cachedChunks[fnIdx] = nChunk;
                         Value* nextSlots = top - argCount;
                         for (int i = argCount; i < nChunk->localsCount; ++i) {
                             *top++ = Value();
@@ -904,6 +911,141 @@ Value VM::run(Chunk* chunk) {
                 ip += 2;
                 const std::string& modName = curChunk->constants[idx].strVal;
                 loadLibrary(modName);
+                break;
+            }
+            case OpCode::OP_INC_LOCAL: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                ip += 2;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    slots[slot].intVal++;
+                } else if (slots[slot].type == ValueType::FLOAT) {
+                    slots[slot].floatVal += 1.0;
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operasi '+' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik atau string yang valid.");
+                } else {
+                    slots[slot] = slots[slot] + Value(static_cast<int64_t>(1));
+                }
+                break;
+            }
+            case OpCode::OP_DEC_LOCAL: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                ip += 2;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    slots[slot].intVal--;
+                } else if (slots[slot].type == ValueType::FLOAT) {
+                    slots[slot].floatVal -= 1.0;
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operasi '-' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik yang valid.");
+                } else {
+                    slots[slot] = slots[slot] - Value(static_cast<int64_t>(1));
+                }
+                break;
+            }
+            case OpCode::OP_ADD_LOCAL_INT: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                uint16_t constIdx = static_cast<uint16_t>((code[ip + 2] << 8) | code[ip + 3]);
+                ip += 4;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    slots[slot].intVal += curChunk->constants[constIdx].intVal;
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operasi '+' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik atau string yang valid.");
+                } else {
+                    slots[slot] = slots[slot] + curChunk->constants[constIdx];
+                }
+                break;
+            }
+            case OpCode::OP_SUB_LOCAL_INT: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                uint16_t constIdx = static_cast<uint16_t>((code[ip + 2] << 8) | code[ip + 3]);
+                ip += 4;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    slots[slot].intVal -= curChunk->constants[constIdx].intVal;
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operasi '-' tidak dapat dilakukan pada 'nil'.", curChunk, ip, frameCount, "", "Pastikan variabel memiliki nilai numerik yang valid.");
+                } else {
+                    slots[slot] = slots[slot] - curChunk->constants[constIdx];
+                }
+                break;
+            }
+            case OpCode::OP_JUMP_IF_LOCAL_GE_CONST: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                uint16_t constIdx = static_cast<uint16_t>((code[ip + 2] << 8) | code[ip + 3]);
+                uint16_t offset = static_cast<uint16_t>((code[ip + 4] << 8) | code[ip + 5]);
+                ip += 6;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    if (slots[slot].intVal >= curChunk->constants[constIdx].intVal) {
+                        ip += offset;
+                    }
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operator '<' tidak dapat membandingkan 'nil' dengan 'int'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                } else {
+                    if (slots[slot] >= curChunk->constants[constIdx]) {
+                        ip += offset;
+                    }
+                }
+                break;
+            }
+            case OpCode::OP_JUMP_IF_LOCAL_GT_CONST: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                uint16_t constIdx = static_cast<uint16_t>((code[ip + 2] << 8) | code[ip + 3]);
+                uint16_t offset = static_cast<uint16_t>((code[ip + 4] << 8) | code[ip + 5]);
+                ip += 6;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    if (slots[slot].intVal > curChunk->constants[constIdx].intVal) {
+                        ip += offset;
+                    }
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operator '<=' tidak dapat membandingkan 'nil' dengan 'int'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                } else {
+                    if (slots[slot] > curChunk->constants[constIdx]) {
+                        ip += offset;
+                    }
+                }
+                break;
+            }
+            case OpCode::OP_JUMP_IF_LOCAL_LE_CONST: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                uint16_t constIdx = static_cast<uint16_t>((code[ip + 2] << 8) | code[ip + 3]);
+                uint16_t offset = static_cast<uint16_t>((code[ip + 4] << 8) | code[ip + 5]);
+                ip += 6;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    if (slots[slot].intVal <= curChunk->constants[constIdx].intVal) {
+                        ip += offset;
+                    }
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operator '>' tidak dapat membandingkan 'nil' dengan 'int'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                } else {
+                    if (slots[slot] <= curChunk->constants[constIdx]) {
+                        ip += offset;
+                    }
+                }
+                break;
+            }
+            case OpCode::OP_JUMP_IF_LOCAL_LT_CONST: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                uint16_t constIdx = static_cast<uint16_t>((code[ip + 2] << 8) | code[ip + 3]);
+                uint16_t offset = static_cast<uint16_t>((code[ip + 4] << 8) | code[ip + 5]);
+                ip += 6;
+                if (__builtin_expect(slots[slot].type == ValueType::INT, 1)) {
+                    if (slots[slot].intVal < curChunk->constants[constIdx].intVal) {
+                        ip += offset;
+                    }
+                } else if (slots[slot].isNil()) {
+                    runtimeError("TypeError", "Operator '>=' tidak dapat membandingkan 'nil' dengan 'int'.", curChunk, ip, frameCount, "", "Periksa apakah variabel bernilai 'nil' sebelum melakukan perbandingan.");
+                } else {
+                    if (slots[slot] < curChunk->constants[constIdx]) {
+                        ip += offset;
+                    }
+                }
+                break;
+            }
+            case OpCode::OP_FAST_LOOP: {
+                uint16_t slot = static_cast<uint16_t>((code[ip] << 8) | code[ip + 1]);
+                uint16_t offset = static_cast<uint16_t>((code[ip + 2] << 8) | code[ip + 3]);
+                ip += 4;
+                if (--slots[slot].intVal > 0) {
+                    ip -= offset;
+                }
                 break;
             }
         }

@@ -2,6 +2,7 @@
 #include "Lexer.hpp"
 #include "StandardLibrary.hpp"
 #include "Diagnostic.hpp"
+#include <fstream>
 
 Parser::Parser(std::vector<Token> tokens)
     : tokens_(std::move(tokens)), cursor_(0), anonFnCounter_(0) {
@@ -417,8 +418,13 @@ std::unique_ptr<Stmt> Parser::parseUse() {
     match(TokenType::NEWLINE);
     if (!mod.empty() && mod != "io" && mod != "math" && mod != "time" && mod != "net" && mod != "http" && mod != "gui" && mod != "str" && mod != "string") {
         std::string filename = mod;
-        if (filename.size() < 4 || filename.substr(filename.size() - 4) != ".eas") {
-            filename += ".eas";
+        if (filename.size() < 4 || (filename.substr(filename.size() - 4) != ".fsn" && filename.substr(filename.size() - 4) != ".eas")) {
+            std::ifstream testFsn(filename + ".fsn");
+            if (testFsn.good()) {
+                filename += ".fsn";
+            } else {
+                filename += ".eas";
+            }
         }
         Value content = StandardLibrary::readFile(filename);
         if (!content.strVal.empty()) {

@@ -8,7 +8,7 @@
 Repl::Repl() {}
 
 void Repl::run() {
-    std::cout << "EasLang Interactive Environment (v1.0)\n";
+    std::cout << "Fasthon Interactive Environment (v1.0)\n";
     std::cout << "Type 'exit' to quit.\n\n";
 
     std::string line;
@@ -110,7 +110,7 @@ void Repl::run() {
 
     while (true) {
         if (buffer.empty()) {
-            std::cout << "EasLang> ";
+            std::cout << "Fasthon> ";
         } else {
             std::cout << "... ";
         }

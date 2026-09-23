@@ -1,0 +1,8 @@
+use io
+
+nama = io.input("Nama kamu siapa: ")
+
+if nama == "Agus"
+    print "Halo Gusion!"
+else
+    print "Halo ${nama}"

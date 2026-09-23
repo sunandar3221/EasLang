@@ -1,5 +1,6 @@
 #include "BytecodeCompiler.hpp"
 #include <algorithm>
+#include <functional>
 
 BytecodeCompiler::BytecodeCompiler()
     : currentChunk_(nullptr), scopeDepth_(0), maxLocals_(0) {}
@@ -8,11 +9,93 @@ const std::unordered_map<std::string, std::shared_ptr<Chunk>>& BytecodeCompiler:
     return functions_;
 }
 
+void BytecodeCompiler::collectFnFreeVars(BlockStmt* block) {
+    if (!block) return;
+    for (const auto& stmt : block->statements) {
+        if (auto* fnDecl = dynamic_cast<FnDeclStmt*>(stmt.get())) {
+            std::unordered_set<std::string> fnLocals(fnDecl->params.begin(), fnDecl->params.end());
+            std::function<void(Stmt*)> scanStmt;
+            std::function<void(Expr*)> scanExpr;
+
+            scanExpr = [&](Expr* expr) {
+                if (!expr) return;
+                if (auto* v = dynamic_cast<VarExpr*>(expr)) {
+                    if (fnLocals.find(v->name) == fnLocals.end()) {
+                        sharedGlobals_.insert(v->name);
+                    }
+                } else if (auto* b = dynamic_cast<BinaryExpr*>(expr)) {
+                    scanExpr(b->left.get());
+                    scanExpr(b->right.get());
+                } else if (auto* u = dynamic_cast<UnaryExpr*>(expr)) {
+                    scanExpr(u->right.get());
+                } else if (auto* c = dynamic_cast<CallExpr*>(expr)) {
+                    if (fnLocals.find(c->callee) == fnLocals.end()) {
+                        sharedGlobals_.insert(c->callee);
+                    }
+                    for (const auto& arg : c->arguments) scanExpr(arg.get());
+                } else if (auto* l = dynamic_cast<ListLiteralExpr*>(expr)) {
+                    for (const auto& el : l->elements) scanExpr(el.get());
+                } else if (auto* idx = dynamic_cast<IndexExpr*>(expr)) {
+                    scanExpr(idx->target.get());
+                    scanExpr(idx->index.get());
+                } else if (auto* g = dynamic_cast<GetExpr*>(expr)) {
+                    scanExpr(g->target.get());
+                    if (g->property) scanExpr(g->property.get());
+                } else if (auto* lp = dynamic_cast<LoopExpr*>(expr)) {
+                    scanExpr(lp->count.get());
+                    scanStmt(lp->body.get());
+                } else if (auto* ifE = dynamic_cast<IfExpr*>(expr)) {
+                    scanExpr(ifE->condition.get());
+                    scanStmt(ifE->thenBranch.get());
+                    if (ifE->elseBranch) scanStmt(ifE->elseBranch.get());
+                }
+            };
+
+            scanStmt = [&](Stmt* s) {
+                if (!s) return;
+                if (auto* assign = dynamic_cast<AssignStmt*>(s)) {
+                    scanExpr(assign->value.get());
+                    fnLocals.insert(assign->name);
+                } else if (auto* idxAssign = dynamic_cast<IndexAssignStmt*>(s)) {
+                    scanExpr(idxAssign->target.get());
+                    scanExpr(idxAssign->index.get());
+                    scanExpr(idxAssign->value.get());
+                } else if (auto* ex = dynamic_cast<ExprStmt*>(s)) {
+                    scanExpr(ex->expression.get());
+                } else if (auto* ret = dynamic_cast<ReturnStmt*>(s)) {
+                    if (ret->value) scanExpr(ret->value.get());
+                } else if (auto* ifS = dynamic_cast<IfStmt*>(s)) {
+                    scanExpr(ifS->condition.get());
+                    scanStmt(ifS->thenBranch.get());
+                    if (ifS->elseBranch) scanStmt(ifS->elseBranch.get());
+                } else if (auto* wh = dynamic_cast<WhileStmt*>(s)) {
+                    scanExpr(wh->condition.get());
+                    scanStmt(wh->body.get());
+                } else if (auto* lp = dynamic_cast<LoopStmt*>(s)) {
+                    scanExpr(lp->count.get());
+                    scanStmt(lp->body.get());
+                } else if (auto* bl = dynamic_cast<BlockStmt*>(s)) {
+                    for (const auto& st : bl->statements) scanStmt(st.get());
+                } else if (auto* pr = dynamic_cast<PrintStmt*>(s)) {
+                    for (const auto& a : pr->arguments) scanExpr(a.get());
+                } else if (auto* wr = dynamic_cast<WriteStmt*>(s)) {
+                    scanExpr(wr->path.get());
+                    scanExpr(wr->content.get());
+                }
+            };
+
+            scanStmt(fnDecl->body.get());
+        }
+    }
+}
+
 std::shared_ptr<Chunk> BytecodeCompiler::compile(BlockStmt* program) {
     mainChunk_ = std::make_shared<Chunk>("__main__", 0);
     currentChunk_ = mainChunk_.get();
     locals_.clear();
-    scopeDepth_ = 0;
+    sharedGlobals_.clear();
+    collectFnFreeVars(program);
+    scopeDepth_ = 1;
     maxLocals_ = 0;
 
     compileBlock(program);
@@ -63,7 +146,7 @@ void BytecodeCompiler::compileBlock(BlockStmt* block) {
     for (size_t i = 0; i < block->statements.size(); ++i) {
         bool isLast = (i + 1 == block->statements.size());
         Stmt* stmt = block->statements[i].get();
-        if (isLast && scopeDepth_ > 0) {
+        if (isLast && currentChunk_ != mainChunk_.get()) {
             if (auto* exprStmt = dynamic_cast<ExprStmt*>(stmt)) {
                 compileExpr(exprStmt->expression.get());
                 continue;
@@ -104,16 +187,52 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
     if (!stmt) return;
 
     if (auto* assign = dynamic_cast<AssignStmt*>(stmt)) {
-        compileExpr(assign->value.get());
-        if (scopeDepth_ > 0) {
+        bool isShared = (sharedGlobals_.find(assign->name) != sharedGlobals_.end());
+        if (scopeDepth_ > 0 && !isShared) {
             int local = resolveLocal(assign->name);
             if (local < 0) {
                 addLocal(assign->name);
                 local = static_cast<int>(locals_.size() - 1);
             }
+
+            // Peephole: var = var + 1 or var = var - 1 or var = var +/- C
+            if (auto* bin = dynamic_cast<BinaryExpr*>(assign->value.get())) {
+                auto* varLeft = dynamic_cast<VarExpr*>(bin->left.get());
+                auto* litRight = dynamic_cast<LiteralExpr*>(bin->right.get());
+                if (varLeft && varLeft->name == assign->name && litRight && litRight->value.isInt()) {
+                    int64_t delta = litRight->value.intVal;
+                    if (bin->op == TokenType::PLUS && delta == 1) {
+                        currentChunk_->emitOp(OpCode::OP_INC_LOCAL, assign->line);
+                        currentChunk_->emitShort(static_cast<uint16_t>(local), assign->line);
+                        return;
+                    }
+                    if (bin->op == TokenType::MINUS && delta == 1) {
+                        currentChunk_->emitOp(OpCode::OP_DEC_LOCAL, assign->line);
+                        currentChunk_->emitShort(static_cast<uint16_t>(local), assign->line);
+                        return;
+                    }
+                    if (bin->op == TokenType::PLUS && delta >= -32768 && delta <= 32767) {
+                        size_t constIdx = currentChunk_->addConstant(litRight->value);
+                        currentChunk_->emitOp(OpCode::OP_ADD_LOCAL_INT, assign->line);
+                        currentChunk_->emitShort(static_cast<uint16_t>(local), assign->line);
+                        currentChunk_->emitShort(static_cast<uint16_t>(constIdx), assign->line);
+                        return;
+                    }
+                    if (bin->op == TokenType::MINUS && delta >= -32768 && delta <= 32767) {
+                        size_t constIdx = currentChunk_->addConstant(litRight->value);
+                        currentChunk_->emitOp(OpCode::OP_SUB_LOCAL_INT, assign->line);
+                        currentChunk_->emitShort(static_cast<uint16_t>(local), assign->line);
+                        currentChunk_->emitShort(static_cast<uint16_t>(constIdx), assign->line);
+                        return;
+                    }
+                }
+            }
+
+            compileExpr(assign->value.get());
             currentChunk_->emitOp(OpCode::OP_SET_LOCAL, assign->line);
             currentChunk_->emitShort(static_cast<uint16_t>(local), assign->line);
         } else {
+            compileExpr(assign->value.get());
             size_t idx = currentChunk_->addConstant(Value(assign->name));
             currentChunk_->emitOp(OpCode::OP_SET_GLOBAL, assign->line);
             currentChunk_->emitShort(static_cast<uint16_t>(idx), assign->line);
@@ -181,6 +300,42 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
 
     if (auto* whileStmt = dynamic_cast<WhileStmt*>(stmt)) {
         size_t loopStart = currentChunk_->code.size();
+
+        // Peephole: while var < INT_LITERAL or while var <= INT_LITERAL
+        if (auto* bin = dynamic_cast<BinaryExpr*>(whileStmt->condition.get())) {
+            auto* varLeft = dynamic_cast<VarExpr*>(bin->left.get());
+            auto* litRight = dynamic_cast<LiteralExpr*>(bin->right.get());
+            bool isShared = varLeft ? (sharedGlobals_.find(varLeft->name) != sharedGlobals_.end()) : false;
+            int local = (varLeft && !isShared) ? resolveLocal(varLeft->name) : -1;
+            if (varLeft && local >= 0 && litRight && litRight->value.isInt() && (bin->op == TokenType::LESS || bin->op == TokenType::LESS_EQUAL)) {
+                OpCode jumpOp = (bin->op == TokenType::LESS) ? OpCode::OP_JUMP_IF_LOCAL_GE_CONST : OpCode::OP_JUMP_IF_LOCAL_GT_CONST;
+                size_t constIdx = currentChunk_->addConstant(litRight->value);
+                currentChunk_->emitOp(jumpOp, whileStmt->line);
+                currentChunk_->emitShort(static_cast<uint16_t>(local), whileStmt->line);
+                currentChunk_->emitShort(static_cast<uint16_t>(constIdx), whileStmt->line);
+                currentChunk_->emit(0xff, whileStmt->line);
+                currentChunk_->emit(0xff, whileStmt->line);
+                size_t exitJump = currentChunk_->code.size() - 2;
+
+                loopStack_.push_back({ {}, {} });
+                compileBlock(whileStmt->body.get());
+                LoopContext loopCtx = loopStack_.back();
+                loopStack_.pop_back();
+
+                for (size_t cj : loopCtx.continueJumps) {
+                    patchJump(cj);
+                }
+
+                emitLoop(loopStart, whileStmt->line);
+                patchJump(exitJump);
+
+                for (size_t bj : loopCtx.breakJumps) {
+                    patchJump(bj);
+                }
+                return;
+            }
+        }
+
         compileExpr(whileStmt->condition.get());
         size_t exitJump = emitJump(OpCode::OP_JUMP_IF_FALSE, whileStmt->line);
         currentChunk_->emitOp(OpCode::OP_POP, whileStmt->line);
@@ -213,14 +368,15 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
         currentChunk_->emitShort(static_cast<uint16_t>(slot), loopStmt->line);
         currentChunk_->emitOp(OpCode::OP_POP, loopStmt->line);
 
-        size_t loopStart = currentChunk_->code.size();
-        currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopStmt->line);
+        size_t constZero = currentChunk_->addConstant(Value(static_cast<int64_t>(0)));
+        currentChunk_->emitOp(OpCode::OP_JUMP_IF_LOCAL_LE_CONST, loopStmt->line);
         currentChunk_->emitShort(static_cast<uint16_t>(slot), loopStmt->line);
-        currentChunk_->writeConstant(Value(static_cast<int64_t>(0)), loopStmt->line);
-        currentChunk_->emitOp(OpCode::OP_GREATER, loopStmt->line);
-        size_t exitJump = emitJump(OpCode::OP_JUMP_IF_FALSE, loopStmt->line);
-        currentChunk_->emitOp(OpCode::OP_POP, loopStmt->line);
+        currentChunk_->emitShort(static_cast<uint16_t>(constZero), loopStmt->line);
+        currentChunk_->emit(0xff, loopStmt->line);
+        currentChunk_->emit(0xff, loopStmt->line);
+        size_t exitJump = currentChunk_->code.size() - 2;
 
+        size_t loopStart = currentChunk_->code.size();
         loopStack_.push_back({ {}, {} });
         compileBlock(loopStmt->body.get());
         LoopContext loopCtx = loopStack_.back();
@@ -230,17 +386,12 @@ void BytecodeCompiler::compileStmt(Stmt* stmt) {
             patchJump(cj);
         }
 
-        currentChunk_->emitOp(OpCode::OP_GET_LOCAL, loopStmt->line);
+        currentChunk_->emitOp(OpCode::OP_FAST_LOOP, loopStmt->line);
         currentChunk_->emitShort(static_cast<uint16_t>(slot), loopStmt->line);
-        currentChunk_->writeConstant(Value(static_cast<int64_t>(1)), loopStmt->line);
-        currentChunk_->emitOp(OpCode::OP_SUB, loopStmt->line);
-        currentChunk_->emitOp(OpCode::OP_SET_LOCAL, loopStmt->line);
-        currentChunk_->emitShort(static_cast<uint16_t>(slot), loopStmt->line);
-        currentChunk_->emitOp(OpCode::OP_POP, loopStmt->line);
+        size_t loopOffset = currentChunk_->code.size() - loopStart + 2;
+        currentChunk_->emitShort(static_cast<uint16_t>(loopOffset), loopStmt->line);
 
-        emitLoop(loopStart, loopStmt->line);
         patchJump(exitJump);
-        currentChunk_->emitOp(OpCode::OP_POP, loopStmt->line);
 
         for (size_t bj : loopCtx.breakJumps) {
             patchJump(bj);
@@ -357,7 +508,8 @@ void BytecodeCompiler::compileExpr(Expr* expr) {
     }
 
     if (auto* var = dynamic_cast<VarExpr*>(expr)) {
-        if (scopeDepth_ > 0) {
+        bool isShared = (sharedGlobals_.find(var->name) != sharedGlobals_.end());
+        if (scopeDepth_ > 0 && !isShared) {
             int local = resolveLocal(var->name);
             if (local >= 0) {
                 currentChunk_->emitOp(OpCode::OP_GET_LOCAL, var->line, var->column, static_cast<int>(var->name.size()));
