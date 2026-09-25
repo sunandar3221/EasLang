@@ -149,29 +149,30 @@ Bagi pengembang yang ingin memodifikasi atau berkontribusi pada source code Fast
 
 ## 3. Kursus Kilat Fasthon (Crash Course)
 
-### Bab 1: Output, Variabel Dinamis, String Interpolation & Komentar
-Di Fasthon, cukup tulis nama variabel dan nilainya tanpa tipe data dan tanpa titik koma. Output ditampilkan menggunakan keyword `print`. Pemanggilan variabel di dalam string dapat ditulis langsung menggunakan **String Interpolation** (`${variabel}` atau `$variabel`), multi-argumen dengan spasi pemisah, maupun penggabungan string (`+`). Komentar dapat ditulis menggunakan `#` (gaya Python/Ruby) maupun `//` (gaya C/JavaScript):
+### Bab 1: Output, Variabel (`var`/`let`), Quotes, Semicolons & Komentar Komprehensif
+Di Fasthon, Anda bebas menulis variabel secara langsung atau menggunakan kata kunci `var` / `let`. String dapat diapit kutip tunggal (`'...'`) maupun kutip ganda (`"..."`). Output ditampilkan menggunakan keyword `print`. Pemanggilan variabel di dalam string dapat ditulis langsung menggunakan **String Interpolation** (`${variabel}` atau `$variabel`). Banyak statement dalam 1 baris dapat dipisahkan dengan titik koma (`;`). Komentar didukung dalam segala gaya populer:
 
 ```fasthon
-# Ini adalah komentar satu baris gaya Python
-// Ini adalah komentar satu baris gaya C/JS
+# Komentar satu baris gaya Python/Shell
+// Komentar satu baris gaya C/C++/JavaScript/Java
+/* Komentar blok multi-baris
+   gaya C / C++ */
+-- Komentar satu baris gaya Lua
+--[[ Komentar blok multi-baris
+     gaya Lua ]]
 
-name = "Budi"
-age = 20  # Variabel dinamis otomatis terdefinisi
+# Deklarasi variabel bebas (langsung atau via var / let)
+nama = 'Budi'
+var umur = 20
+let kota = "Jakarta"
 
-# 1. String Interpolation (${variabel} atau $variabel)
-print "halo ${name}, umur kamu ${age}"
-print "Nama: $name, Umur: $age tahun"
+# Banyak statement dalam satu baris (dipisahkan titik koma)
+x = 10; y = 20; z = x + y;
 
-# 2. String Interpolation dengan Ekspresi Matematis / Fungsi
-print "Tahun depan umur kamu: ${age + 1}"
-
-# 3. Pemanggilan Standar & Multi-argumen
-print name
-print age
-print "Halo nama saya " + name
-print "Nama:", name, "Umur:", age
-print("Halo Dunia")
+# String Interpolation (${variabel} atau $variabel)
+print "Halo ${nama}, umur kamu ${umur} tinggal di ${kota}"
+print "Tahun depan umur kamu: ${umur + 1}"
+print("Total x + y =", z)
 ```
 
 > ⚡ **Performa Maksimal (Zero Runtime Overhead)**:
@@ -277,19 +278,44 @@ print lower("Halo Dunia")  # Output: halo dunia
 print upper("halo dunia")  # Output: HALO DUNIA
 ```
 
-### Bab 5: Perulangan (`loop` & `while`), `break`, dan `continue`
-- Gunakan `loop <jumlah>` untuk mengulang blok sebanyak $n$ kali secara terhitung (tutup dengan `end`).
-- Gunakan `while <kondisi>` untuk perulangan berbasis evaluasi kondisi (tutup dengan `end`).
-- Gunakan `break` untuk keluar dari loop seketika.
-- Gunakan `continue` untuk melompati sisa iterasi saat ini dan lanjut ke iterasi berikutnya.
+### Bab 5: Perulangan Komprehensif (`for`, `loop`, `while`, `repeat ... until`), `break`, dan `continue`
+Fasthon v2.0.0 menghadirkan arsitektur perulangan yang sangat fleksibel dan berkecepatan tinggi:
+- **Numeric For Loop**: `for i = start, end [, step] [do] ... end` atau `for i = start to end [step s] [do] ... end`.
+- **For-In Loop (Iterasi Koleksi)**: `for item in koleksi [do] ... end`.
+- **Repeat ... Until Loop (Gaya Lua)**: `repeat ... until <kondisi>`.
+- **Counter Loop**: `loop <jumlah> [do] ... end` (mengulang $n$ kali secara terhitung).
+- **While Loop**: `while <kondisi> [do] ... end`.
+- **Aliran Kontrol**: `break` untuk keluar dari loop seketika, dan `continue` untuk melompati sisa iterasi saat ini.
 
 ```fasthon
-# Perulangan loop terhitung
+# 1. Numeric For Loop
+for i = 1, 5 do
+    print "Nilai i: " + str(i)
+end
+
+# Numeric For dengan custom step atau kata kunci 'to'
+for j = 1 to 10 step 2 do
+    print "Ganjil: ${j}"
+end
+
+# 2. For-In Loop (Iterasi List/Array)
+buah = ["Apel", "Jeruk", "Mangga",]
+for item in buah do
+    print "Buah pilihan: ${item}"
+end
+
+# 3. Repeat ... Until Loop (Dijalankan minimal 1 kali hingga kondisi terpenuhi)
+k = 0
+repeat
+    k = k + 1
+until k >= 3
+
+# 4. Perulangan loop terhitung
 loop 3
     print "Pengulangan loop"
 end
 
-# Perulangan while dengan break dan continue
+# 5. Perulangan while dengan break dan continue
 i = 0
 while true
     i = i + 1

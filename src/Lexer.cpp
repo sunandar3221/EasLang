@@ -32,6 +32,12 @@ void Lexer::initKeywords() {
     keywords_["return"] = TokenType::RETURN;
     keywords_["loop"] = TokenType::LOOP;
     keywords_["while"] = TokenType::WHILE;
+    keywords_["for"] = TokenType::FOR;
+    keywords_["in"] = TokenType::IN;
+    keywords_["var"] = TokenType::VAR;
+    keywords_["let"] = TokenType::VAR;
+    keywords_["repeat"] = TokenType::REPEAT;
+    keywords_["until"] = TokenType::UNTIL;
     keywords_["fn"] = TokenType::FN;
     keywords_["def"] = TokenType::FN;
     keywords_["func"] = TokenType::FN;
@@ -57,12 +63,19 @@ void Lexer::initKeywords() {
     keywords_["not"] = TokenType::NOT;
     keywords_["true"] = TokenType::TRUE;
     keywords_["True"] = TokenType::TRUE;
+    keywords_["TRUE"] = TokenType::TRUE;
     keywords_["false"] = TokenType::FALSE;
     keywords_["False"] = TokenType::FALSE;
+    keywords_["FALSE"] = TokenType::FALSE;
     keywords_["nil"] = TokenType::NIL;
+    keywords_["Nil"] = TokenType::NIL;
+    keywords_["NIL"] = TokenType::NIL;
     keywords_["null"] = TokenType::NIL;
+    keywords_["Null"] = TokenType::NIL;
+    keywords_["NULL"] = TokenType::NIL;
     keywords_["None"] = TokenType::NIL;
     keywords_["none"] = TokenType::NIL;
+    keywords_["NONE"] = TokenType::NIL;
 }
 
 bool Lexer::isAtEnd() const {
@@ -110,12 +123,12 @@ void Lexer::handleIndentation(std::vector<Token>& /*tokens*/) {
     atLineStart_ = false;
 }
 
-Token Lexer::readString() {
+Token Lexer::readString(char quoteChar) {
     int startLine = line_;
     int startCol = column_ - 1;
     std::string val;
 
-    while (!isAtEnd() && peek() != '"') {
+    while (!isAtEnd() && peek() != quoteChar) {
         if (peek() == '\n') {
             line_++;
             column_ = 1;
@@ -127,7 +140,9 @@ Token Lexer::readString() {
                 if (esc == 'n') val += '\n';
                 else if (esc == 't') val += '\t';
                 else if (esc == 'r') val += '\r';
+                else if (esc == quoteChar) val += quoteChar;
                 else if (esc == '"') val += '"';
+                else if (esc == '\'') val += '\'';
                 else if (esc == '\\') val += '\\';
                 else if (esc == '$') {
                     val += '\\';
@@ -140,11 +155,12 @@ Token Lexer::readString() {
         }
     }
 
-    if (!isAtEnd() && peek() == '"') {
+    if (!isAtEnd() && peek() == quoteChar) {
         advance();
     } else {
         int span = std::max(1, static_cast<int>(val.size() + 1));
-        errors_.push_back(Diagnostic::format("SyntaxError", "String literal tidak ditutup (unterminated string literal).", startLine, startCol, span, "", "Pastikan menambahkan tanda kutip penutup '\"' di akhir teks string."));
+        std::string qStr = (quoteChar == '\'') ? "'" : "\"";
+        errors_.push_back(Diagnostic::format("SyntaxError", "String literal tidak ditutup (unterminated string literal).", startLine, startCol, span, "", "Pastikan menambahkan tanda kutip penutup '" + qStr + "' di akhir teks string."));
     }
 
     Token tok(TokenType::STRING, val, startLine, startCol);
@@ -232,6 +248,48 @@ std::vector<Token> Lexer::tokenize() {
             continue;
         }
 
+        if (c == '/' && peek() == '*') {
+            advance();
+            while (!isAtEnd()) {
+                if (peek() == '\n') {
+                    line_++;
+                    column_ = 0;
+                }
+                if (peek() == '*' && peekNext() == '/') {
+                    advance();
+                    advance();
+                    break;
+                }
+                advance();
+            }
+            continue;
+        }
+
+        if (c == '-' && peek() == '-') {
+            advance();
+            if (peek() == '[' && peekNext() == '[') {
+                advance();
+                advance();
+                while (!isAtEnd()) {
+                    if (peek() == '\n') {
+                        line_++;
+                        column_ = 0;
+                    }
+                    if (peek() == ']' && peekNext() == ']') {
+                        advance();
+                        advance();
+                        break;
+                    }
+                    advance();
+                }
+            } else {
+                while (!isAtEnd() && peek() != '\n') {
+                    advance();
+                }
+            }
+            continue;
+        }
+
         if (c == '\n') {
             if (bracketNesting_ == 0) {
                 if (!tokens.empty() && tokens.back().type != TokenType::NEWLINE) {
@@ -244,8 +302,8 @@ std::vector<Token> Lexer::tokenize() {
             continue;
         }
 
-        if (c == '"') {
-            tokens.push_back(readString());
+        if (c == '"' || c == '\'') {
+            tokens.push_back(readString(c));
             continue;
         }
 
@@ -270,6 +328,10 @@ std::vector<Token> Lexer::tokenize() {
             case '!':
                 if (match('=')) tokens.emplace_back(TokenType::BANG_EQUAL, "!=", curLine, curCol);
                 else tokens.emplace_back(TokenType::NOT, "!", curLine, curCol);
+                break;
+            case '~':
+                if (match('=')) tokens.emplace_back(TokenType::BANG_EQUAL, "!=", curLine, curCol);
+                else tokens.emplace_back(TokenType::NOT, "~", curLine, curCol);
                 break;
             case '<':
                 if (match('=')) tokens.emplace_back(TokenType::LESS_EQUAL, "<=", curLine, curCol);
@@ -301,6 +363,13 @@ std::vector<Token> Lexer::tokenize() {
                 tokens.emplace_back(TokenType::RBRACKET, "]", curLine, curCol);
                 break;
             case ',': tokens.emplace_back(TokenType::COMMA, ",", curLine, curCol); break;
+            case ';':
+                if (bracketNesting_ == 0) {
+                    if (!tokens.empty() && tokens.back().type != TokenType::NEWLINE) {
+                        tokens.emplace_back(TokenType::NEWLINE, ";", curLine, curCol);
+                    }
+                }
+                break;
             case '.': tokens.emplace_back(TokenType::DOT, ".", curLine, curCol); break;
             case '&':
                 if (match('&')) tokens.emplace_back(TokenType::AND, "&&", curLine, curCol);

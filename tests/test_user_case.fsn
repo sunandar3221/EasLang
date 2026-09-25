@@ -1,0 +1,7 @@
+def HelloWorld(hai)
+
+ print(hai)
+
+end
+
+HelloWorld('tes')

@@ -131,7 +131,7 @@ jobs:
           if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
-            echo "tag=v1.0.0" >> $GITHUB_OUTPUT
+            echo "tag=v2.0.0" >> $GITHUB_OUTPUT
           fi
 
       - name: Publish to GitHub Release

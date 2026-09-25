@@ -8,7 +8,7 @@
 Repl::Repl() {}
 
 void Repl::run() {
-    std::cout << "Fasthon Interactive Environment (v1.0)\n";
+    std::cout << "Fasthon Interactive Environment (v2.0)\n";
     std::cout << "Type 'exit' to quit.\n\n";
 
     std::string line;
@@ -45,7 +45,8 @@ void Repl::run() {
             return false;
         };
         return startsWithWord("if") || startsWithWord("else") || startsWithWord("elif") ||
-               startsWithWord("while") || startsWithWord("loop") || startsWithWord("fn") ||
+               startsWithWord("while") || startsWithWord("loop") || startsWithWord("for") ||
+               startsWithWord("repeat") || startsWithWord("fn") ||
                startsWithWord("def") || startsWithWord("func") || startsWithWord("function");
     };
 
@@ -154,7 +155,7 @@ void Repl::run() {
             if (startsBlock(trimmed)) {
                 blockLevel++;
             }
-            if (trimmed == "end") {
+            if (trimmed == "end" || trimmed.rfind("until", 0) == 0) {
                 if (blockLevel > 0) blockLevel--;
             }
             if (blockLevel <= 0 && !countBrackets(buffer)) {

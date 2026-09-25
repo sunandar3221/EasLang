@@ -45,6 +45,8 @@ private:
     std::unique_ptr<Stmt> parseIf(bool isElif = false);
     std::unique_ptr<Stmt> parseLoop();
     std::unique_ptr<Stmt> parseWhile();
+    std::unique_ptr<Stmt> parseFor();
+    std::unique_ptr<Stmt> parseRepeat();
     std::unique_ptr<Stmt> parseFnDecl();
     std::unique_ptr<Stmt> parseReturn();
     std::unique_ptr<Stmt> parseBreak();

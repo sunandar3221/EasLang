@@ -1,0 +1,77 @@
+# ==========================================
+# TEST FASHTON v2.0.0 FEATURES & ROBUSTNESS
+# ==========================================
+
+// 1. Uji Multi-Gaya Komentar
+# Ini komentar bergaya Python
+// Ini komentar bergaya C++
+/* Ini komentar block
+   bergaya C multi-baris */
+-- Ini komentar bergaya Lua
+--[[ Ini komentar block
+     bergaya Lua multi-baris ]]
+
+print("1. Komentar: SUKSES")
+
+// 2. Uji String Kutip Tunggal & Ganda
+name = 'Fasthon'
+version = "2.0.0"
+desc = 'Bahasa ' + name + ' versi ' + version
+print("2. String quotes: " + desc)
+
+// 3. Uji Titik Koma (Multiple statements satu baris)
+x = 10; y = 20; z = x + y;
+print("3. Semicolon statements: z =", z)
+
+// 4. Uji Operator ~= (Lua not equal)
+if x ~= y then
+    print("4. Operator ~= bekerja dengan baik (x ~= y)")
+end
+
+// 5. Uji Kata Kunci var dan let
+var angkaPertama = 100
+let angkaKedua = 200
+print("5. var & let: total =", angkaPertama + angkaKedua)
+
+// 6. Uji Numeric For Loop
+print("6. Numeric for loop:")
+total = 0
+for i = 1, 5 do
+    total = total + i
+end
+print("   Total 1 sampai 5 =", total)
+
+// 7. Uji For-in Loop (Iterasi List)
+print("7. For-in loop:")
+items = ["apel", "pisang", "mangga",]
+for fruit in items do
+    print("   Buah:", fruit)
+end
+
+// 8. Uji Repeat ... Until Loop
+print("8. Repeat ... Until:")
+k = 0
+repeat
+    k = k + 1
+until k >= 3
+print("   Nilai k setelah repeat-until =", k)
+
+// 9. Uji Trailing Commas pada parameter, pemanggilan, dan list
+def hitung(a, b, c,)
+    return a + b + c
+end
+
+hasil = hitung(10, 20, 30,)
+listAngka = [1, 2, 3, 4,]
+print("9. Trailing commas: hasil =", hasil, "len =", len(listAngka))
+
+// 10. Uji Ketahanan Parser terhadap spasi liar (Indentation independence)
+def testSpasi(val)
+
+       print("   Di dalam fungsi spasi bebas:", val)
+
+end
+
+testSpasi("KOKOH!")
+
+print("SEMUA PENGUJIAN FITUR v2.0.0 BERHASIL 100%!")

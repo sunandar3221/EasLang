@@ -207,7 +207,7 @@ std::string Diagnostic::format(
 
 const std::vector<std::string>& Diagnostic::getKeywords() {
     static const std::vector<std::string> kws = {
-        "while", "loop", "if", "elseif", "elif", "else", "print", "silent_print",
+        "while", "loop", "for", "in", "repeat", "until", "var", "let", "if", "elseif", "elif", "else", "print", "silent_print",
         "fn", "def", "func", "function", "return", "break", "continue",
         "use", "import", "include", "require", "new", "get", "set", "read", "write",
         "send", "app", "window", "run", "end", "then", "do", "and", "or", "not", "true", "false",
@@ -218,7 +218,7 @@ const std::vector<std::string>& Diagnostic::getKeywords() {
 
 const std::vector<std::string>& Diagnostic::getStatementKeywords() {
     static const std::vector<std::string> stmtKws = {
-        "while", "loop", "if", "elseif", "elif", "else", "print", "silent_print",
+        "while", "loop", "for", "repeat", "var", "let", "if", "elseif", "elif", "else", "print", "silent_print",
         "fn", "def", "func", "function", "return", "break", "continue",
         "use", "import", "read", "write", "app", "window", "run", "set"
     };

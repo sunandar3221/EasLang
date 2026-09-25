@@ -248,6 +248,12 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         case TokenType::IF: return parseIf();
         case TokenType::LOOP: return parseLoop();
         case TokenType::WHILE: return parseWhile();
+        case TokenType::FOR: return parseFor();
+        case TokenType::REPEAT: return parseRepeat();
+        case TokenType::VAR: {
+            advance(); // consume 'var' or 'let'
+            return parseAssignmentOrExpr();
+        }
         case TokenType::FN: return parseFnDecl();
         case TokenType::RETURN: return parseReturn();
         case TokenType::BREAK: return parseBreak();
@@ -263,7 +269,7 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
             return nullptr;
         }
         case TokenType::END: {
-            reportError("Kata kunci 'end' tidak terduga tanpa pembuka blok ('if', 'while', 'loop', atau 'def'/'fn')", peek(), "Hapus 'end' yang berlebih.", "Setiap kata kunci 'end' harus berpasangan dengan blok kontrol yang sesuai.");
+            reportError("Kata kunci 'end' tidak terduga tanpa pembuka blok ('if', 'while', 'for', 'loop', atau 'def'/'fn')", peek(), "Hapus 'end' yang berlebih.", "Setiap kata kunci 'end' harus berpasangan dengan blok kontrol yang sesuai.");
             advance();
             return nullptr;
         }
@@ -284,16 +290,16 @@ std::unique_ptr<Stmt> Parser::parsePrint(bool silent) {
     std::vector<std::unique_ptr<Expr>> args;
 
     if (match(TokenType::LPAREN)) {
-        if (!check(TokenType::RPAREN)) {
-            do {
-                skipNewlines();
-                if (check(TokenType::RPAREN) || isAtEnd()) break;
-                auto expr = parseExpression();
-                if (expr) {
-                    args.push_back(std::move(expr));
-                }
-                skipNewlines();
-            } while (match(TokenType::COMMA));
+        while (!check(TokenType::RPAREN) && !isAtEnd()) {
+            skipNewlines();
+            if (check(TokenType::RPAREN) || isAtEnd()) break;
+            auto expr = parseExpression();
+            if (expr) {
+                args.push_back(std::move(expr));
+            }
+            skipNewlines();
+            if (!match(TokenType::COMMA)) break;
+            skipNewlines();
         }
         if (!match(TokenType::RPAREN)) {
             reportError("Expected closing ')' after print arguments", peek());
@@ -507,6 +513,167 @@ std::unique_ptr<Stmt> Parser::parseWhile() {
     return std::make_unique<WhileStmt>(std::move(condition), std::move(body), line);
 }
 
+std::unique_ptr<Stmt> Parser::parseFor() {
+    Token forTok = advance();
+    int line = forTok.line;
+
+    if (!check(TokenType::IDENTIFIER)) {
+        reportError("Diharapkan nama variabel loop setelah 'for'", peek(), "Contoh: 'for i = 1, 10 do' atau 'for item in list do'");
+        return nullptr;
+    }
+
+    std::string varName = advance().lexeme;
+
+    // 1. For-in loop: for item in iterable [do] ... end
+    if (match(TokenType::IN)) {
+        auto iterExpr = parseExpression();
+        if (match(TokenType::DO)) {}
+        if (check(TokenType::NEWLINE)) advance();
+        auto userBody = parseBlock(false);
+        skipNewlines();
+        if (!match(TokenType::END)) {
+            reportError("Diharapkan 'end' untuk menutup blok 'for'", peek(), "Tambahkan 'end' di akhir blok 'for'.", "Setiap blok 'for' wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+        }
+
+        int idNum = ++anonFnCounter_;
+        std::string iterVar = "__iter_" + std::to_string(idNum);
+        std::string idxVar = "__idx_" + std::to_string(idNum);
+        std::string lenVar = "__len_" + std::to_string(idNum);
+
+        auto outerBlock = std::make_unique<BlockStmt>();
+        outerBlock->statements.push_back(std::make_unique<AssignStmt>(iterVar, std::move(iterExpr), line));
+        outerBlock->statements.push_back(std::make_unique<AssignStmt>(idxVar, std::make_unique<LiteralExpr>(Value(static_cast<int64_t>(0)), line), line));
+
+        std::vector<std::unique_ptr<Expr>> lenArgs;
+        lenArgs.push_back(std::make_unique<VarExpr>(iterVar, line));
+        outerBlock->statements.push_back(std::make_unique<AssignStmt>(lenVar, std::make_unique<CallExpr>("len", std::move(lenArgs), line), line));
+
+        auto loopBody = std::make_unique<BlockStmt>();
+        loopBody->statements.push_back(std::make_unique<AssignStmt>(
+            varName,
+            std::make_unique<IndexExpr>(std::make_unique<VarExpr>(iterVar, line), std::make_unique<VarExpr>(idxVar, line), line),
+            line
+        ));
+        for (auto& s : userBody->statements) {
+            loopBody->statements.push_back(std::move(s));
+        }
+        loopBody->statements.push_back(std::make_unique<AssignStmt>(
+            idxVar,
+            std::make_unique<BinaryExpr>(std::make_unique<VarExpr>(idxVar, line), TokenType::PLUS, std::make_unique<LiteralExpr>(Value(static_cast<int64_t>(1)), line), line),
+            line
+        ));
+
+        auto cond = std::make_unique<BinaryExpr>(std::make_unique<VarExpr>(idxVar, line), TokenType::LESS, std::make_unique<VarExpr>(lenVar, line), line);
+        outerBlock->statements.push_back(std::make_unique<WhileStmt>(std::move(cond), std::move(loopBody), line));
+        return outerBlock;
+    }
+
+    // 2. Numeric for: for i = start, end [, step] [do] ... end
+    // or: for i = start to end [step s] [do] ... end
+    if (match(TokenType::ASSIGN) || (check(TokenType::IDENTIFIER) && peek().lexeme == "to")) {
+        std::unique_ptr<Expr> startExpr = nullptr;
+        if (previous().lexeme == "to") {
+            startExpr = std::make_unique<LiteralExpr>(Value(static_cast<int64_t>(1)), line);
+        } else {
+            startExpr = parseExpression();
+            if (check(TokenType::IDENTIFIER) && peek().lexeme == "to") {
+                advance(); // consume 'to'
+            } else {
+                match(TokenType::COMMA);
+            }
+        }
+
+        auto endExpr = parseExpression();
+        std::unique_ptr<Expr> stepExpr = nullptr;
+
+        if (match(TokenType::COMMA)) {
+            stepExpr = parseExpression();
+        } else if (check(TokenType::IDENTIFIER) && peek().lexeme == "step") {
+            advance(); // consume 'step'
+            stepExpr = parseExpression();
+        } else {
+            stepExpr = std::make_unique<LiteralExpr>(Value(static_cast<int64_t>(1)), line);
+        }
+
+        if (match(TokenType::DO)) {}
+        if (check(TokenType::NEWLINE)) advance();
+        auto userBody = parseBlock(false);
+        skipNewlines();
+        if (!match(TokenType::END)) {
+            reportError("Diharapkan 'end' untuk menutup blok 'for'", peek(), "Tambahkan 'end' di akhir blok 'for'.", "Setiap blok 'for' wajib ditutup dengan kata kunci 'end' (gaya Lua).");
+        }
+
+        int idNum = ++anonFnCounter_;
+        std::string endVar = "__end_" + std::to_string(idNum);
+        std::string stepVar = "__step_" + std::to_string(idNum);
+
+        auto outerBlock = std::make_unique<BlockStmt>();
+        outerBlock->statements.push_back(std::make_unique<AssignStmt>(varName, std::move(startExpr), line));
+        outerBlock->statements.push_back(std::make_unique<AssignStmt>(endVar, std::move(endExpr), line));
+        outerBlock->statements.push_back(std::make_unique<AssignStmt>(stepVar, std::move(stepExpr), line));
+
+        auto loopBody = std::make_unique<BlockStmt>();
+        for (auto& s : userBody->statements) {
+            loopBody->statements.push_back(std::move(s));
+        }
+        loopBody->statements.push_back(std::make_unique<AssignStmt>(
+            varName,
+            std::make_unique<BinaryExpr>(std::make_unique<VarExpr>(varName, line), TokenType::PLUS, std::make_unique<VarExpr>(stepVar, line), line),
+            line
+        ));
+
+        auto cond = std::make_unique<BinaryExpr>(std::make_unique<VarExpr>(varName, line), TokenType::LESS_EQUAL, std::make_unique<VarExpr>(endVar, line), line);
+        outerBlock->statements.push_back(std::make_unique<WhileStmt>(std::move(cond), std::move(loopBody), line));
+        return outerBlock;
+    }
+
+    reportError("Sintaks 'for' tidak valid. Gunakan 'for i = 1, 10 do' atau 'for x in list do'", peek());
+    return nullptr;
+}
+
+std::unique_ptr<Stmt> Parser::parseRepeat() {
+    Token repTok = advance();
+    int line = repTok.line;
+
+    if (check(TokenType::NEWLINE)) advance();
+    auto body = std::make_unique<BlockStmt>();
+
+    while (!isAtEnd() && !check(TokenType::UNTIL)) {
+        skipNewlines();
+        if (isAtEnd() || check(TokenType::UNTIL)) break;
+        size_t prevCursor = cursor_;
+        auto stmt = parseStatement();
+        if (stmt) {
+            body->statements.push_back(std::move(stmt));
+        }
+        if (cursor_ == prevCursor && !isAtEnd()) {
+            advance();
+        }
+    }
+
+    skipNewlines();
+    if (!match(TokenType::UNTIL)) {
+        reportError("Diharapkan 'until' untuk menutup blok 'repeat'", peek(), "Tambahkan 'until <kondisi>' di akhir blok 'repeat'.", "Setiap blok 'repeat' wajib diakhiri dengan 'until <kondisi>'.");
+        return nullptr;
+    }
+
+    int untilLine = previous().line;
+    auto condition = parseExpression();
+    if (!condition) {
+        reportError("Diharapkan ekspresi kondisi setelah 'until'", peek());
+    }
+
+    if (check(TokenType::NEWLINE)) advance();
+
+    // Desugar repeat ... until cond into while true do body... if cond then break end end
+    auto breakBlock = std::make_unique<BlockStmt>();
+    breakBlock->statements.push_back(std::make_unique<BreakStmt>(untilLine));
+    auto ifStmt = std::make_unique<IfStmt>(std::move(condition), std::move(breakBlock), nullptr, untilLine);
+    body->statements.push_back(std::move(ifStmt));
+
+    return std::make_unique<WhileStmt>(std::make_unique<LiteralExpr>(Value(true), line), std::move(body), line);
+}
+
 std::unique_ptr<Stmt> Parser::parseFnDecl() {
     Token keywordTok = advance();
     int line = keywordTok.line;
@@ -519,20 +686,22 @@ std::unique_ptr<Stmt> Parser::parseFnDecl() {
 
     if (match(TokenType::LPAREN)) {
         skipNewlines();
-        if (!check(TokenType::RPAREN)) {
-            do {
-                skipNewlines();
-                if (check(TokenType::RPAREN) || isAtEnd()) break;
-                if (check(TokenType::IDENTIFIER)) {
-                    params.push_back(advance().lexeme);
-                } else {
-                    reportError("Diharapkan nama parameter dalam deklarasi fungsi", peek());
-                    if (!isAtEnd() && !check(TokenType::RPAREN) && !check(TokenType::COMMA) && !check(TokenType::NEWLINE)) {
-                        advance();
-                    }
+        while (!check(TokenType::RPAREN) && !isAtEnd()) {
+            skipNewlines();
+            if (check(TokenType::RPAREN) || isAtEnd()) break;
+            if (check(TokenType::IDENTIFIER)) {
+                params.push_back(advance().lexeme);
+            } else {
+                reportError("Diharapkan nama parameter dalam deklarasi fungsi", peek());
+                if (!isAtEnd() && !check(TokenType::RPAREN) && !check(TokenType::COMMA) && !check(TokenType::NEWLINE)) {
+                    advance();
                 }
-                skipNewlines();
-            } while (match(TokenType::COMMA));
+            }
+            skipNewlines();
+            if (!match(TokenType::COMMA)) {
+                break;
+            }
+            skipNewlines();
         }
         skipNewlines();
         match(TokenType::RPAREN);
@@ -921,13 +1090,13 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
                 if (fullName == "io.print") {
                     if (match(TokenType::LPAREN)) {
                         std::vector<std::unique_ptr<Expr>> args;
-                        if (!check(TokenType::RPAREN)) {
-                            do {
-                                skipNewlines();
-                                if (check(TokenType::RPAREN) || isAtEnd()) break;
-                                args.push_back(parseExpression());
-                                skipNewlines();
-                            } while (match(TokenType::COMMA));
+                        while (!check(TokenType::RPAREN) && !isAtEnd()) {
+                            skipNewlines();
+                            if (check(TokenType::RPAREN) || isAtEnd()) break;
+                            args.push_back(parseExpression());
+                            skipNewlines();
+                            if (!match(TokenType::COMMA)) break;
+                            skipNewlines();
                         }
                         match(TokenType::RPAREN);
                         return std::make_unique<CallExpr>(fullName, std::move(args), line, col);
@@ -949,13 +1118,13 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
 
                 if (match(TokenType::LPAREN)) {
                     std::vector<std::unique_ptr<Expr>> args;
-                    if (!check(TokenType::RPAREN)) {
-                        do {
-                            skipNewlines();
-                            if (check(TokenType::RPAREN) || isAtEnd()) break;
-                            args.push_back(parseExpression());
-                            skipNewlines();
-                        } while (match(TokenType::COMMA));
+                    while (!check(TokenType::RPAREN) && !isAtEnd()) {
+                        skipNewlines();
+                        if (check(TokenType::RPAREN) || isAtEnd()) break;
+                        args.push_back(parseExpression());
+                        skipNewlines();
+                        if (!match(TokenType::COMMA)) break;
+                        skipNewlines();
                     }
                     match(TokenType::RPAREN);
                     return std::make_unique<CallExpr>(fullName, std::move(args), line, col);
@@ -989,13 +1158,13 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
             }
             std::vector<std::unique_ptr<Expr>> args;
             if (match(TokenType::LPAREN)) {
-                if (!check(TokenType::RPAREN)) {
-                    do {
-                        skipNewlines();
-                        if (check(TokenType::RPAREN) || isAtEnd()) break;
-                        args.push_back(parseExpression());
-                        skipNewlines();
-                    } while (match(TokenType::COMMA));
+                while (!check(TokenType::RPAREN) && !isAtEnd()) {
+                    skipNewlines();
+                    if (check(TokenType::RPAREN) || isAtEnd()) break;
+                    args.push_back(parseExpression());
+                    skipNewlines();
+                    if (!match(TokenType::COMMA)) break;
+                    skipNewlines();
                 }
                 match(TokenType::RPAREN);
             } else {
@@ -1009,13 +1178,13 @@ std::unique_ptr<Expr> Parser::parseCallOrPrimary() {
 
         if (match(TokenType::LPAREN)) {
             std::vector<std::unique_ptr<Expr>> args;
-            if (!check(TokenType::RPAREN)) {
-                do {
-                    skipNewlines();
-                    if (check(TokenType::RPAREN) || isAtEnd()) break;
-                    args.push_back(parseExpression());
-                    skipNewlines();
-                } while (match(TokenType::COMMA));
+            while (!check(TokenType::RPAREN) && !isAtEnd()) {
+                skipNewlines();
+                if (check(TokenType::RPAREN) || isAtEnd()) break;
+                args.push_back(parseExpression());
+                skipNewlines();
+                if (!match(TokenType::COMMA)) break;
+                skipNewlines();
             }
             match(TokenType::RPAREN);
             return std::make_unique<CallExpr>(id, std::move(args), line, col);
@@ -1056,13 +1225,13 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
     if (match(TokenType::LBRACKET)) {
         std::vector<std::unique_ptr<Expr>> elems;
         skipNewlines();
-        if (!check(TokenType::RBRACKET)) {
-            do {
-                skipNewlines();
-                if (check(TokenType::RBRACKET) || isAtEnd()) break;
-                elems.push_back(parseExpression());
-                skipNewlines();
-            } while (match(TokenType::COMMA));
+        while (!check(TokenType::RBRACKET) && !isAtEnd()) {
+            skipNewlines();
+            if (check(TokenType::RBRACKET) || isAtEnd()) break;
+            elems.push_back(parseExpression());
+            skipNewlines();
+            if (!match(TokenType::COMMA)) break;
+            skipNewlines();
         }
         skipNewlines();
         if (!match(TokenType::RBRACKET)) {
@@ -1087,13 +1256,13 @@ std::unique_ptr<Expr> Parser::parsePrimary() {
         bool silent = (advance().type == TokenType::SILENT_PRINT);
         std::vector<std::unique_ptr<Expr>> args;
         if (match(TokenType::LPAREN)) {
-            if (!check(TokenType::RPAREN)) {
-                do {
-                    skipNewlines();
-                    if (check(TokenType::RPAREN) || isAtEnd()) break;
-                    args.push_back(parseExpression());
-                    skipNewlines();
-                } while (match(TokenType::COMMA));
+            while (!check(TokenType::RPAREN) && !isAtEnd()) {
+                skipNewlines();
+                if (check(TokenType::RPAREN) || isAtEnd()) break;
+                args.push_back(parseExpression());
+                skipNewlines();
+                if (!match(TokenType::COMMA)) break;
+                skipNewlines();
             }
             if (!match(TokenType::RPAREN)) {
                 reportError("Tanda kurung penutup ')' diharapkan", peek(), "", "Pastikan menambahkan ')' untuk menutup pemanggilan print.");

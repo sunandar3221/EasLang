@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
 
     std::string arg1 = argv[1];
     if (arg1 == "-v" || arg1 == "--version" || arg1 == "version") {
-        std::cout << "Fasthon v1.0.0 (Ultra High-Performance Engine)\n";
+        std::cout << "Fasthon v2.0.0 (Ultra High-Performance Engine)\n";
         return 0;
     }
     if (arg1 == "-h" || arg1 == "--help" || arg1 == "help") {

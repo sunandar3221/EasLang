@@ -1,0 +1,32 @@
+# STRESS TEST PARSER KEKOKOHAN v2.0.0
+
+// Kombinasi komentar berlapis dan spasi aneh
+/* Komentar 1 */ // Komentar 2
+-- Komentar 3
+--[[ Komentar 4 ]]
+
+let daftar = [
+    1,
+    2,
+    3,
+]
+
+var total = 0
+for x in daftar do
+    -- hitung
+    total = total + x;
+end
+
+/* loop bertingkat */
+for i = 1, 3 do
+    for j = 1, 2 do
+        total = total + 1;
+    end
+end
+
+k = 5
+repeat
+    k = k - 1
+until k <= 2
+
+print("STRESS TEST PASS! total =", total, "k =", k)

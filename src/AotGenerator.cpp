@@ -764,6 +764,11 @@ void AotGenerator::generateStmt(Stmt* stmt, std::ostringstream& ss) {
         ss << "continue;\n";
         return;
     }
+
+    if (auto* blockStmt = dynamic_cast<BlockStmt*>(stmt)) {
+        generateBlock(blockStmt, ss, false);
+        return;
+    }
 }
 
 std::string AotGenerator::generateCpp(BlockStmt* program) {

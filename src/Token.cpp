@@ -19,6 +19,11 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::ELIF: return "ELIF";
         case TokenType::LOOP: return "LOOP";
         case TokenType::WHILE: return "WHILE";
+        case TokenType::FOR: return "FOR";
+        case TokenType::IN: return "IN";
+        case TokenType::VAR: return "VAR";
+        case TokenType::REPEAT: return "REPEAT";
+        case TokenType::UNTIL: return "UNTIL";
         case TokenType::FN: return "FN";
         case TokenType::RETURN: return "RETURN";
         case TokenType::BREAK: return "BREAK";
