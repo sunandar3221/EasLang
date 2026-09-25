@@ -54,10 +54,17 @@ Seluruh berkas binary resmi Fasthon otomatis dikompilasi oleh **GitHub Actions C
    ```bash
    curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash
    ```
-   > 💡 **Apa yang dilakukan skrip ini?**
-   > - Mendeteksi arsitektur CPU secara otomatis (`x86_64` atau `ARM64/aarch64`).
-   > - Mengunduh binary prebuilt teroptimasi dari GitHub Releases.
-   > - Memasang binary langsung ke `/usr/local/bin/fasthon` (atau `~/.local/bin/fasthon`).
+   > 💡 **Pilihan Versi Interaktif & Otomatis**:
+   > - **Mode Interaktif**: Jika dijalankan langsung di terminal, installer akan menampilkan menu pilihan:
+   >   - Ketik `1` untuk **Fasthon v2.0.0** (Terbaru & Direkomendasikan).
+   >   - Ketik `2` untuk **Fasthon v1.0.0** (Versi Stabil Lama).
+   > - **Otomatis Tanpa Tanya (Non-Interaktif)**:
+   >   - Pasang Versi 2: `curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash -s -- 2`
+   >   - Pasang Versi 1: `curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash -s -- 1`
+   > - **Fitur Installer**:
+   >   - Mendeteksi arsitektur CPU secara otomatis (`x86_64` atau `ARM64/aarch64`).
+   >   - Mengunduh binary prebuilt teroptimasi dari GitHub Releases.
+   >   - Memasang binary langsung ke `/usr/local/bin/fasthon` (atau `~/.local/bin/fasthon`).
 
 3. **Verifikasi Instalasi**:
    Ketik perintah `fasthon` untuk masuk ke interactive REPL:
@@ -86,6 +93,7 @@ Fasthon dapat berjalan secara native dan berkecepatan penuh di smartphone Androi
    curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash
    ```
    > 💡 **Kelebihan di Termux:**
+   > - **Pilihan Versi**: Anda dapat memilih **Versi 2** (v2.0.0 terbaru) atau **Versi 1** (v1.0.0) saat installer berjalan, atau langsung memasang versi 2 via `curl -sSL https://raw.githubusercontent.com/sunandar3221/Fasthon/main/install.sh | bash -s -- 2`.
    > - Mengunduh binary native Android Bionic (`fasthon-android-arm64`) yang dikompilasi langsung menggunakan Google Android NDK Clang.
    > - Otomatis terpasang ke `$PREFIX/bin/fasthon` sehingga tidak butuh akses root/sudo sama sekali.
 
