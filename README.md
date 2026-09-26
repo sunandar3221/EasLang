@@ -552,17 +552,57 @@ Fasthon memberikan fleksibilitas tinggi dalam cara pemanggilan modul:
 
 Fasthon menyediakan fungsi bawaan global tingkat sistem yang dapat digunakan langsung tanpa perlu memuat pustaka tambahan:
 
-#### 1. Konversi Tipe Data
-- **`str(val)`**: Mengonversi nilai apa pun (angka, boolean, list, objek) menjadi bentuk teks string.
-- **`int(val)`**: Mengonversi nilai angka/string menjadi integer 64-bit.
-- **`float(val)`**: Mengonversi nilai menjadi floating-point presisi ganda (64-bit float).
+#### 1. Memahami Tipe Data & Fungsi Konversi `int` (Integer 64-bit)
+
+##### A. Apa itu `int` di Fasthon?
+`int` (kependekan dari *integer*) adalah **tipe data bilangan bulat 64-bit bertanda (*signed 64-bit integer*)** di Fasthon. Karakteristik utamanya:
+- **Bilangan Bulat Murni**: Tidak memiliki titik/koma desimal, baik bernilai positif, nol, maupun negatif (contoh: `-100`, `0`, `42`, `1000000`).
+- **Kapasitas Ekstra Besar (64-bit)**: Memiliki rentang nilai dari **$-9.223.372.036.854.775.808$ hingga $+9.223.372.036.854.775.807$** (setara dengan `int64_t` di C/C++), sehingga sangat aman dari masalah *integer overflow* pada perhitungan komputasi umum maupun finansial.
+- **Kinerja Ultra-Tinggi (Zero Overhead)**: Di dalam Virtual Machine dan kompilasi biner native AOT Fasthon, tipe `int` diproses secara langsung (*unboxed*) pada register CPU 64-bit tanpa alokasi memori tambahan di heap.
+
+##### B. Fungsi Bawaan `int(val)` & Kapan Harus Digunakan
+Secara bawaan, masukan dari pengguna (`input()`) dan isi berkas teks (`read()`) dibaca sebagai teks bertipe `string`. Di sinilah fungsi `int(val)` sangat penting:
+
+1. **Mencegah Kesalahan Penggabungan Teks (*String Concatenation Bug*)**:
+   Jika dua variabel bertipe teks dijumlahkan dengan operator `+`, Fasthon akan menyambungkan teksnya:
+   ```fasthon
+   a = "10"
+   b = "20"
+   print a + b          # Output: "1020" (penggabungan teks, BUKAN penjumlahan matematika!)
+   print int(a) + int(b) # Output: 30 (penjumlahan matematika sejati setelah dikonversi ke int)
+   ```
+2. **Memperbaiki Perbandingan Logika Numerik**:
+   Perbandingan string dilakukan secara alfabetis (leksikografis), di mana karakter `"1"` dianggap lebih kecil daripada `"2"`, sehingga `"100" < "20"` menghasilkan `true`. Dengan mengonversinya ke `int`:
+   ```fasthon
+   print "100" < "20"         # Output: true (salah secara matematika karena perbandingan alfabetis)
+   print int("100") < int("20") # Output: false (benar, 100 lebih besar dari 20)
+   ```
+3. **Memotong Angka Pecahan (*Truncation* dari `float`)**:
+   Jika mengonversi angka desimal berpecahan (`float`), fungsi `int()` akan membuang bagian pecahan di belakang koma:
+   ```fasthon
+   print int(9.85)   # Output: 9
+   print int(-4.7)   # Output: -4
+   ```
+4. **Konversi dari Boolean**:
+   Mengonversi status kebenaran menjadi representasi numerik biner:
+   ```fasthon
+   print int(true)   # Output: 1
+   print int(false)  # Output: 0
+   ```
+
+##### C. Fungsi Konversi Lainnya: `str(val)` & `float(val)`
+- **`str(val)`**: Mengonversi nilai apa pun (angka, boolean, list, objek) menjadi bentuk teks string. Berguna untuk digabungkan dengan pesan atau disimpan ke berkas.
+- **`float(val)`**: Mengonversi teks string atau integer menjadi angka desimal presisi ganda (*64-bit double precision float*).
 
 ```fasthon
-teks = "123"
-angka = int(teks)
-desimal = float("3.1415")
-hasilGabung = "Nilai: ${angka}"  # atau "Nilai: " + str(angka)
-print hasilGabung
+use io
+
+# Contoh Praktis Aplikasi Kasir:
+hargaTeks = "25000"
+jumlahTeks = "3"
+
+total = int(hargaTeks) * int(jumlahTeks)
+print "Total Belanja: Rp " + str(total)  # Output: Total Belanja: Rp 75000
 ```
 
 #### 2. Inspeksi Ukuran & Koleksi Data
@@ -845,15 +885,23 @@ else
 | `print` | Output | Menampilkan satu atau beberapa nilai ke konsol standar dengan spasi pemisah dan diakhiri baris baru | `print "Halo" 123` |
 | `silent_print` | Output | Memformat teks seperti `print` tanpa mencetak ke konsol terminal (menampung output untuk loop assignment) | `silent_print "Data"` |
 | `if` | Logika | Memulai blok percabangan kondisional berbasis indentasi bersih | `if score > 75` |
+| `then` | Logika | Penanda opsional setelah kondisi percabangan `if` (gaya Lua/Pascal) | `if score > 75 then` |
 | `elseif` / `elif` | Logika | Percabangan alternatif multikondisi jika kondisi sebelumnya tidak terpenuhi | `elseif score >= 60` |
 | `else` | Logika | Blok alternatif jika seluruh kondisi `if` / `elseif` sebelumnya salah | `else` |
+| `for` | Iterasi | Perulangan numerik dengan batas rentang (`for i = 1, 10`) atau perulangan iterasi koleksi list (`for item in list`) | `for i = 1, 5 do` |
+| `in` | Iterasi | Menentukan koleksi list yang akan diiterasi pada for-in loop | `for item in list do` |
+| `to` / `step` | Iterasi | Kata kunci kontekstual penentu batas akhir dan langkah lompatan pada numeric for loop | `for i = 1 to 10 step 2 do` |
+| `repeat` | Iterasi | Perulangan gaya Lua yang berjalan minimal 1 kali hingga kondisi `until` terpenuhi | `repeat x = x + 1 until x >= 5` |
+| `until` | Iterasi | Menutup blok `repeat` dan mengevaluasi kondisi terminasi perulangan | `until count == 10` |
 | `loop` | Iterasi | Mengulang eksekusi blok sebanyak $n$ kali secara terhitung | `loop 10` |
 | `while` | Iterasi | Mengulang eksekusi blok selama ekspresi kondisional bernilai benar | `while x > 0` |
-| `break` | Kontrol Loop | Menghentikan eksekusi perulangan (`while` atau `loop`) dan keluar seketika | `break` |
+| `do` | Struktur | Penanda opsional pembuka blok loop (`for`, `while`, `loop`) atau fungsi | `while x > 0 do` |
+| `break` | Kontrol Loop | Menghentikan eksekusi perulangan (`for`, `while`, `loop`, `repeat`) dan keluar seketika | `break` |
 | `continue` | Kontrol Loop | Melompati sisa baris iterasi saat ini dan langsung ke iterasi loop berikutnya | `continue` |
+| `var` / `let` | Variabel | Kata kunci deklarasi variabel eksplisit opsional (gaya JS/Go/Swift/Rust) | `var a = 10` atau `let b = 20` |
 | `return` | Fungsi | Mengembalikan nilai dari fungsi secara eksplisit / keluar lebih awal | `return hasil` |
-| `fn` / `def` / `func` | Fungsi | Mendeklarasikan fungsi baru (mendukung implicit dan explicit return) | `def calc a b` atau `fn x` |
-| `use` / `import` | Modul | Mengimpor berkas modul `.fsn` eksternal atau pustaka bawaan (didukung juga `include` / `require`) | `use io` atau `import math` |
+| `fn` / `def` / `func` / `function` | Fungsi | Mendeklarasikan fungsi baru (mendukung implicit dan explicit return) | `def calc a b` atau `fn x` |
+| `use` / `import` / `include` / `require` | Modul | Mengimpor berkas modul `.fsn` eksternal atau pustaka bawaan sistem | `use io` atau `import math` |
 | `new` | Objek | Menginstansiasi objek map/state baru di memori | `user = new` |
 | `get` | Objek / HTTP | Mengambil properti objek (`get obj "key"`) atau melakukan HTTP GET (`get "url"`) | `get user "name"` |
 | `set` | Objek | Menetapkan nilai properti pada objek/map (`set obj "key" val`) | `set user "age" 25` |
@@ -863,9 +911,9 @@ else
 | `app` | Desktop GUI | Menetapkan judul untuk aplikasi jendela desktop (`use gui`) | `app "Title Window"` |
 | `window` | Desktop GUI | Mengatur lebar dan tinggi jendela GUI desktop native (`use gui`) | `window 1024 768` |
 | `run` | Desktop GUI | Memulai message pump dan lifecycle aplikasi desktop native (`use gui`) | `run` atau `run 1000` |
-| `end` | Struktur | Keyword penutup blok opsional bagi pengguna yang ingin penutup eksplisit | `end` |
-| `true` / `True` | Nilai | Literal boolean benar | `isAktif = true` |
-| `false` / `False` | Nilai | Literal boolean salah | `isAktif = false` |
+| `end` | Struktur | Kata kunci penutup blok kontrol (`if`, `for`, `while`, `loop`, `def`/`fn`) bergaya Lua | `end` |
+| `true` / `True` / `TRUE` | Nilai | Literal boolean benar | `isAktif = true` |
+| `false` / `False` / `FALSE` | Nilai | Literal boolean salah | `isAktif = false` |
 | `nil` / `null` / `None` | Nilai | Literal nilai kosong / ketiadaan nilai | `data = nil` |
 
 ### 4.2 Kamus Fungsi Bawaan Global (Built-in Functions)
@@ -874,10 +922,10 @@ Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use
 
 | Fungsi | Parameter | Nilai Balik | Keterangan & Contoh |
 | :--- | :--- | :--- | :--- |
+| `int(x)` | Angka, String, Boolean | `int` | Mengonversi nilai menjadi integer 64-bit bertanda murni (memotong desimal float, mengubah teks string angka ke nilai komputasi; panduan lengkap ada di Bab 12) |
+| `float(x)` | Angka, String | `float` | Mengonversi nilai menjadi angka pecahan floating-point 64-bit presisi ganda (`float("3.14")` $\rightarrow$ `3.14`) |
+| `str(x)` | Nilai apa saja | `string` | Mengonversi nilai apa pun menjadi string teks (`str(123)` $\rightarrow$ `"123"`) |
 | `len(x)` | String, List, Objek | `int` | Menghitung panjang teks, jumlah item list, atau jumlah properti objek (`len("Halo")` $\rightarrow$ `4`) |
-| `str(x)` | Nilai apa saja | `string` | Mengonversi nilai apa pun menjadi string (`str(123)` $\rightarrow$ `"123"`) |
-| `int(x)` | Angka, String | `int` | Mengonversi nilai menjadi integer 64-bit (`int("50")` $\rightarrow$ `50`) |
-| `float(x)` | Angka, String | `float` | Mengonversi nilai menjadi angka pecahan floating-point (`float("3.14")` $\rightarrow$ `3.14`) |
 | `push(list, val)` | List, Nilai baru | `val` | Menambahkan elemen baru ke akhir list (`push(buah, "Apel")`) |
 | `pop(list)` | List | Nilai terakhir | Menghapus dan mengembalikan elemen terakhir list (`terakhir = pop(buah)`) |
 | `case_sensitive(a, b)` | Dua teks string | `bool` | Membandingkan dua string dengan membedakan huruf kapital (*case-sensitive*) |
@@ -902,8 +950,13 @@ Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use
 
 | Simbol / Operator | Kategori | Penjelasan Singkat | Contoh Kode |
 | :--- | :--- | :--- | :--- |
-| `#` | Komentar | Menandai baris komentar satu baris (gaya Python/Ruby) | `# Ini komentar` |
-| `//` | Komentar | Menandai baris komentar satu baris (gaya C/JavaScript) | `// Ini komentar` |
+| `#` | Komentar | Menandai baris komentar satu baris (gaya Python/Shell/Ruby) | `# Ini komentar` |
+| `//` | Komentar | Menandai baris komentar satu baris (gaya C/C++/JavaScript) | `// Ini komentar` |
+| `/* ... */` | Komentar | Menandai blok komentar multi-baris (gaya C/C++/Java) | `/* Blok komentar */` |
+| `--` | Komentar | Menandai baris komentar satu baris (gaya Lua) | `-- Komentar Lua` |
+| `--[[ ... ]]` | Komentar | Menandai blok komentar multi-baris (gaya Lua) | `--[[ Blok komentar Lua ]]` |
+| `'...'`, `"..."` | String Literal | Mengapit teks string literal (kutip tunggal maupun ganda dengan interpolasi `${var}`) | `'Halo'`, `"Umur: ${age}"` |
+| `;` | Pemisah Perintah | Memisahkan banyak statement/perintah dalam satu baris yang sama | `x = 10; y = 20; z = x + y;` |
 | `=` | Penetapan Nilai | Menyimpan hasil evaluasi ekspresi ke variabel | `x = 10` |
 | `.` | Member Access | Mengakses properti objek atau fungsi pustaka | `io.write`, `person.role` |
 | `+` | Penjumlahan / Concat | Menjumlahkan dua angka atau menggabungkan string | `10 + 20`, `"A" + "B"` |
@@ -911,9 +964,9 @@ Fungsi-fungsi ini dapat dipanggil langsung dari mana saja tanpa perlu import/use
 | `*` | Perkalian | Mengalikan nilai numerik | `6 * 7` |
 | `/` | Pembagian | Membagi dua angka secara presisi | `100 / 4` |
 | `%` | Modulo | Menghitung sisa hasil bagi | `10 % 3` |
-| `==`, `!=` | Kesetaraan | Memeriksa kesamaan atau perbedaan dua nilai | `a == b`, `x != y` |
-| `<`, `>`, `<=`, `>=` | Relasional | Membandingkan besar-kecil nilai | `score >= 75` |
-| `and`, `or`, `not`, `&&`, `\|\|`, `!` | Logika Boolean | Operator logika AND, OR, dan NOT (kata atau simbol) | `if a and not b`, `x && !y` |
+| `==`, `!=`, `~=` | Kesetaraan | Memeriksa kesamaan atau perbedaan dua nilai (`~=` adalah sinonim `!=` gaya Lua) | `a == b`, `x != y`, `x ~= y` |
+| `<`, `>`, `<=`, `>=` | Relasional | Membandingkan besar-kecil nilai numerik | `score >= 75` |
+| `and`, `or`, `not`, `&&`, `\|\|`, `!` | Logika Boolean | Operator logika AND, OR, dan NOT (kata kunci atau simbol) | `if a and not b`, `x && !y` |
 | `[]` | Indexer / Array Literal | Membuat list literal atau mengakses elemen via indeks | `arr = [1, 2]`, `arr[0]` |
 | `()` | Prioritas / Panggilan | Mengatur prioritas ekspresi atau memanggil fungsi | `(a + b) * c`, `add(1, 2)` |
 
